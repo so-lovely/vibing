@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Alert, AlertDescription } from '../ui/alert';
-import { LoginCredentials } from '../../data/auth/mockData';
+import type { LoginCredentials } from '../../types/auth';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginDialogProps {

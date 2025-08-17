@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, mockProducts, categories, sortOptions, priceFilters } from '../data/products/mockData';
+import { productApi } from '../services/productApi';
+import { sortOptions, priceFilters } from '../constants/products';
+import type { Product } from '../types/product';
 
 interface ProductsContextType {
   // Data
   products: Product[];
-  categories: typeof categories;
+  categories: Array<{ id: string; name: string; count: number }>;
   sortOptions: typeof sortOptions;
   priceFilters: typeof priceFilters;
   
@@ -16,19 +18,22 @@ interface ProductsContextType {
   
   // State
   loading: boolean;
-  filteredProducts: Product[];
+  error: string | null;
   
   // Actions
   setSelectedCategory: (category: string) => void;
   setSelectedSort: (sort: string) => void;
   setSelectedPriceFilter: (priceFilter: string) => void;
   setSearchQuery: (query: string) => void;
-  toggleProductLike: (productId: string) => void;
+  toggleLike: (productId: string) => void;
+  loadProducts: () => Promise<void>;
+  loadCategories: () => Promise<void>;
   
   // Pagination
   currentPage: number;
   itemsPerPage: number;
   totalPages: number;
+  totalItems: number;
   setCurrentPage: (page: number) => void;
 }
 
@@ -39,94 +44,70 @@ interface ProductsProviderProps {
 }
 
 export function ProductsProvider({ children }: ProductsProviderProps) {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; count: number }>>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSort, setSelectedSort] = useState('featured');
+  const [selectedSort, setSelectedSort] = useState('newest');
   const [selectedPriceFilter, setSelectedPriceFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  // Filter and sort products
-  const filteredProducts = React.useMemo(() => {
-    let result = [...products];
-
-    // Apply category filter
-    if (selectedCategory !== 'all') {
-      result = result.filter(product => product.category === selectedCategory);
+  // Load categories from API
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const response = await productApi.getCategories();
+      setCategories(response.categories || response);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      // Fallback to empty categories if API fails
+      setCategories([]);
     }
+  }, []);
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      result = result.filter(product => 
-        product.title.toLowerCase().includes(query) ||
-        product.description.toLowerCase().includes(query) ||
-        product.author.toLowerCase().includes(query) ||
-        product.tags.some(tag => tag.toLowerCase().includes(query))
-      );
+  // Load products from API
+  const loadProducts = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const priceFilter = priceFilters.find(f => f.value === selectedPriceFilter);
+      const filters = {
+        category: selectedCategory,
+        search: searchQuery.trim() || undefined,
+        minPrice: priceFilter?.min,
+        maxPrice: priceFilter?.max,
+        sortBy: selectedSort,
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      const response = await productApi.getProducts(filters);
+      setProducts(response.products);
+      setTotalItems(response.pagination.totalItems);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load products';
+      setError(errorMessage);
+      console.error('Failed to load products:', err);
+    } finally {
+      setLoading(false);
     }
+  }, [selectedCategory, selectedSort, selectedPriceFilter, searchQuery, currentPage]);
 
-    // Apply price filter
-    switch (selectedPriceFilter) {
-      case 'free':
-        result = result.filter(product => product.price === 0);
-        break;
-      case 'paid':
-        result = result.filter(product => product.price > 0);
-        break;
-      case 'under-25':
-        result = result.filter(product => product.price <= 25);
-        break;
-      case 'under-50':
-        result = result.filter(product => product.price <= 50);
-        break;
-      case 'under-100':
-        result = result.filter(product => product.price <= 100);
-        break;
-      default:
-        // 'all' - no filter
-        break;
-    }
+  // Load categories on mount
+  React.useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
-    // Apply sorting
-    switch (selectedSort) {
-      case 'featured':
-        result.sort((a, b) => {
-          // Featured items first, then by rating
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          return b.rating - a.rating;
-        });
-        break;
-      case 'downloads':
-        result.sort((a, b) => b.downloads - a.downloads);
-        break;
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'price-low':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'newest':
-        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      case 'oldest':
-        result.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        break;
-      default:
-        break;
-    }
-
-    return result;
-  }, [products, selectedCategory, selectedSort, selectedPriceFilter, searchQuery]);
+  // Load products when filters change
+  React.useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Calculate pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   // Reset page when filters change
   useEffect(() => {
@@ -158,19 +139,22 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
     
     // State
     loading,
-    filteredProducts,
+    error,
     
     // Actions
     setSelectedCategory,
     setSelectedSort,
     setSelectedPriceFilter,
     setSearchQuery,
-    toggleProductLike,
+    toggleLike: toggleProductLike,
+    loadProducts,
+    loadCategories,
     
     // Pagination
     currentPage,
     itemsPerPage,
     totalPages,
+    totalItems,
     setCurrentPage
   };
 

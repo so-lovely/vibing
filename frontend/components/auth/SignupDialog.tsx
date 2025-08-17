@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Alert, AlertDescription } from '../ui/alert';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { SignupData } from '../../data/auth/mockData';
+import type { SignupData } from '../../types/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { PhoneVerificationProvider, usePhoneVerification } from '../../contexts/PhoneVerificationContext';
 import { PhoneVerificationPage } from '../../pages/PhoneVerificationPage';
@@ -18,7 +18,7 @@ interface SignupDialogProps {
 
 function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any, token: string) => void }) {
   const { signup } = useAuth();
-  const { verificationData, resetVerification } = usePhoneVerification();
+  const { verificationData, resetVerification, setInitialPhone, sendVerificationCode } = usePhoneVerification();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,15 +34,25 @@ function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
 
     // Validate form data
     if (!formData.email || !formData.password || !formData.name || !formData.phone) {
       setError('All fields are required');
+      setLoading(false);
       return;
     }
 
-    // Show phone verification
-    setShowVerification(true);
+    try {
+      // Set the phone number and send verification code directly
+      setInitialPhone(formData.phone);
+      await sendVerificationCode(formData.phone);
+      setShowVerification(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send verification code');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVerificationComplete = async () => {

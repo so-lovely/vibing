@@ -3,7 +3,7 @@ import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { ImageWithFallback } from '../ui/image-with-fallback';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface OrderSummaryProps {
   product: Product;

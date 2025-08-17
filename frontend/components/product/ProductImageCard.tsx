@@ -7,7 +7,7 @@ import { Card, CardContent } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { ImageWithFallback } from '../ui/image-with-fallback';
 import { ContactSellerButton } from '../ContactSellerButton';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface ProductImageCardProps {
   product: Product;

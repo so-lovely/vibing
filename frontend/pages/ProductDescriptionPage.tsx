@@ -6,7 +6,8 @@ import { ProductImageCard } from '../components/product/ProductImageCard';
 import { ProductDetailsCard } from '../components/product/ProductDetailsCard';
 import { SellerReviews } from '../components/product/SellerReviews';
 import { SellerCard } from '../components/product/SellerCard';
-import { mockProducts, type Product } from '../data/products/mockData';
+import type { Product } from '../types/product';
+import { productApi } from '../services/productApi';
 
 export function ProductDescriptionPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,8 +16,12 @@ export function ProductDescriptionPage() {
 
   useEffect(() => {
     if (id) {
-      const foundProduct = mockProducts.find(p => p.id === id);
-      setProduct(foundProduct || null);
+      productApi.getProduct(id)
+        .then(setProduct)
+        .catch((error) => {
+          console.error('Failed to fetch product:', error);
+          setProduct(null);
+        });
     }
   }, [id]);
 

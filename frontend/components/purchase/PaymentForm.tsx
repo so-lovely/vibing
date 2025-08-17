@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface PaymentFormProps {
   product: Product;

@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { productApi } from '../services/productApi';
+import type { Product } from '../types/product';
 
 interface ProductFormData {
   title: string;
@@ -10,18 +12,6 @@ interface ProductFormData {
   productFiles: File[];
 }
 
-interface SellerProduct {
-  id: string;
-  title: string;
-  category: string;
-  price: number;
-  sales: number;
-  revenue: number;
-  views: number;
-  downloads: number;
-  status: 'active' | 'pending' | 'rejected';
-  createdAt: string;
-}
 
 interface SellerStats {
   totalRevenue: number;
@@ -37,53 +27,21 @@ interface SellContextType {
   isUploaded: boolean;
   isEditing: boolean;
   editingProductId: string | null;
-  products: SellerProduct[];
+  products: Product[];
   stats: SellerStats;
+  loading: boolean;
   updateFormData: (field: string, value: string | File | File[] | string[]) => void;
   uploadProduct: () => Promise<void>;
   updateProduct: () => Promise<void>;
   resetForm: () => void;
   setCurrentView: (view: 'dashboard' | 'upload' | 'success' | 'edit') => void;
   editProduct: (id: string) => void;
-  deleteProduct: (id: string) => void;
+  deleteProduct: (id: string) => Promise<void>;
   loadProductForEdit: (id: string) => void;
 }
 
 const SellContext = createContext<SellContextType | undefined>(undefined);
 
-const mockProducts: SellerProduct[] = [
-  {
-    id: '1',
-    title: 'React Authentication Kit',
-    category: 'libraries',
-    price: 29.99,
-    sales: 156,
-    revenue: 4678.44,
-    views: 2847,
-    downloads: 1567,
-    status: 'active',
-    createdAt: '2024-01-15'
-  },
-  {
-    id: '2',
-    title: 'Vue Data Visualization',
-    category: 'libraries',
-    price: 0,
-    sales: 89,
-    revenue: 0,
-    views: 1543,
-    downloads: 1543,
-    status: 'active',
-    createdAt: '2024-01-20'
-  }
-];
-
-const mockStats: SellerStats = {
-  totalRevenue: 4678.44,
-  totalSales: 245,
-  totalProducts: 2,
-  avgRating: 4.7
-};
 
 export function SellProvider({ children }: { children: ReactNode }) {
   const [currentView, setCurrentView] = useState<'dashboard' | 'upload' | 'success' | 'edit'>('dashboard');
@@ -101,8 +59,42 @@ export function SellProvider({ children }: { children: ReactNode }) {
   const [isUploaded, setIsUploaded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [products, setProducts] = useState<SellerProduct[]>(mockProducts);
-  const [stats, setStats] = useState<SellerStats>(mockStats);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState<SellerStats>({
+    totalRevenue: 0,
+    totalSales: 0,
+    totalProducts: 0,
+    avgRating: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSellerData();
+  }, []);
+
+  const loadSellerData = async () => {
+    try {
+      setLoading(true);
+      const productsData = await productApi.getProducts();
+      setProducts(productsData.products);
+      
+      const totalProducts = productsData.products.length;
+      const totalRevenue = productsData.products.reduce((sum, p) => sum + (p.price * p.downloads), 0);
+      const totalSales = productsData.products.reduce((sum, p) => sum + p.downloads, 0);
+      const avgRating = productsData.products.reduce((sum, p) => sum + (p.rating || 0), 0) / totalProducts || 0;
+      
+      setStats({
+        totalRevenue,
+        totalSales,
+        totalProducts,
+        avgRating
+      });
+    } catch (error) {
+      console.error('Failed to load seller data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const updateFormData = (field: string, value: string | File | File[] | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -111,29 +103,37 @@ export function SellProvider({ children }: { children: ReactNode }) {
   const uploadProduct = async () => {
     setIsUploading(true);
     
-    // Simulate upload process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Add new product to list
-    const newProduct: SellerProduct = {
-      id: Date.now().toString(),
-      title: formData.title,
-      category: formData.category,
-      price: parseFloat(formData.price),
-      sales: 0,
-      revenue: 0,
-      views: 0,
-      downloads: 0,
-      status: 'pending',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    
-    setProducts(prev => [newProduct, ...prev]);
-    setStats(prev => ({ ...prev, totalProducts: prev.totalProducts + 1 }));
-    
-    setIsUploading(false);
-    setIsUploaded(true);
-    setCurrentView('success');
+    try {
+      const productData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        price: parseFloat(formData.price),
+        tags: formData.tags,
+        imageUrl: '',
+        author: '',
+        version: '1.0.0',
+        downloads: 0,
+        rating: 0,
+        reviews: 0,
+        isPremium: false,
+        isActive: true,
+        sellerId: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const newProduct = await productApi.createProduct(productData);
+      setProducts(prev => [newProduct, ...prev]);
+      setStats(prev => ({ ...prev, totalProducts: prev.totalProducts + 1 }));
+      
+      setIsUploaded(true);
+      setCurrentView('success');
+    } catch (error) {
+      console.error('Failed to upload product:', error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const resetForm = () => {
@@ -154,25 +154,29 @@ export function SellProvider({ children }: { children: ReactNode }) {
     
     setIsEditing(true);
     
-    // Simulate update process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Update product in list
-    setProducts(prev => prev.map(product => 
-      product.id === editingProductId 
-        ? {
-            ...product,
-            title: formData.title,
-            category: formData.category,
-            price: parseFloat(formData.price)
-          }
-        : product
-    ));
-    
-    setIsEditing(false);
-    setEditingProductId(null);
-    setCurrentView('dashboard');
-    resetForm();
+    try {
+      const updateData = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        price: parseFloat(formData.price),
+        tags: formData.tags
+      };
+      
+      const updatedProduct = await productApi.updateProduct(editingProductId, updateData);
+      
+      setProducts(prev => prev.map(product => 
+        product.id === editingProductId ? updatedProduct : product
+      ));
+      
+      setEditingProductId(null);
+      setCurrentView('dashboard');
+      resetForm();
+    } catch (error) {
+      console.error('Failed to update product:', error);
+    } finally {
+      setIsEditing(false);
+    }
   };
 
   const loadProductForEdit = (id: string) => {
@@ -180,10 +184,10 @@ export function SellProvider({ children }: { children: ReactNode }) {
     if (product) {
       setFormData({
         title: product.title,
-        description: '', // We'll need to expand the mock data to include description
+        description: product.description || '',
         price: product.price.toString(),
         category: product.category,
-        tags: [], // We'll need to expand the mock data to include tags
+        tags: product.tags || [],
         imageFile: null,
         productFiles: [],
       });
@@ -196,9 +200,14 @@ export function SellProvider({ children }: { children: ReactNode }) {
     loadProductForEdit(id);
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-    setStats(prev => ({ ...prev, totalProducts: prev.totalProducts - 1 }));
+  const deleteProduct = async (id: string) => {
+    try {
+      await productApi.deleteProduct(id);
+      setProducts(prev => prev.filter(p => p.id !== id));
+      setStats(prev => ({ ...prev, totalProducts: prev.totalProducts - 1 }));
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+    }
   };
 
   return (
@@ -218,7 +227,8 @@ export function SellProvider({ children }: { children: ReactNode }) {
       setCurrentView,
       editProduct,
       deleteProduct,
-      loadProductForEdit
+      loadProductForEdit,
+      loading
     }}>
       {children}
     </SellContext.Provider>

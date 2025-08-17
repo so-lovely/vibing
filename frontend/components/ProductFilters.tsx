@@ -17,9 +17,10 @@ export function ProductFilters() {
     setSelectedPriceFilter,
     sortOptions,
     priceFilters,
-    filteredProducts,
+    products,
     selectedCategory,
-    categories
+    categories,
+    totalItems
   } = useProducts();
 
   const activeCategory = categories.find(cat => cat.id === selectedCategory);
@@ -118,7 +119,7 @@ export function ProductFilters() {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>
-            {activeCategory?.name}에서 {filteredProducts.length.toLocaleString()}개 제품 발견
+            {activeCategory?.name}에서 {totalItems.toLocaleString()}개 제품 발견
           </span>
           {hasActiveFilters && (
             <div className="flex items-center gap-2">

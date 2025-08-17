@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MoreHorizontal, Trash2, Check, Eye, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useAdmin } from '../../contexts/AdminContext';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 export function ProductManagement() {
   const { products, loading, deleteProduct, approveProduct } = useAdmin();

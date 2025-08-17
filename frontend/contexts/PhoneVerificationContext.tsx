@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { authApi } from '../services/authApi';
 
 export interface VerificationData {
   phone: string;
@@ -16,17 +17,21 @@ interface PhoneVerificationContextType {
   verifyCode: (code: string) => Promise<boolean>;
   resendCode: () => Promise<void>;
   resetVerification: () => void;
+  setInitialPhone: (phone: string) => void;
 }
 
 const PhoneVerificationContext = createContext<PhoneVerificationContextType | undefined>(undefined);
 
-// Mock verification codes for testing
+// Mock verification codes for testing specific phone numbers
 const mockVerificationCodes: Record<string, string> = {
   '+821012345678': '123456',
   '+821087654321': '654321',
   '+821033334444': '111111',
   '+821055556666': '999999',
-  '+821077778888': '555555'
+  '+821077778888': '555555',
+  '+821011112222': '000000',
+  '+821099998888': '123123',
+  '+821044445555': '456456',
 };
 
 export function PhoneVerificationProvider({ children }: { children: React.ReactNode }) {
@@ -46,8 +51,8 @@ export function PhoneVerificationProvider({ children }: { children: React.ReactN
         throw new Error('Invalid phone number format. Use +82XXXXXXXXX');
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call real API
+      const response = await authApi.sendVerificationCode(phone);
       
       // Generate expiry time (5 minutes from now)
       const expiryTime = new Date();
@@ -62,8 +67,12 @@ export function PhoneVerificationProvider({ children }: { children: React.ReactN
       
       setStep('code');
       
-      // In a real app, you'd call an SMS service here
-      console.log(`Verification code sent to ${phone}: ${mockVerificationCodes[phone] || '123456'}`);
+      // Show mock code info in development mode
+      if (mockVerificationCodes[phone]) {
+        console.log(`Development mode - Mock verification code for ${phone}: ${mockVerificationCodes[phone]}`);
+      } else if (response.code) {
+        console.log(`Development mode - Verification code for ${phone}: ${response.code}`);
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send verification code');
@@ -87,14 +96,8 @@ export function PhoneVerificationProvider({ children }: { children: React.ReactN
         throw new Error('Verification code has expired');
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Check if code matches
-      const expectedCode = mockVerificationCodes[verificationData.phone] || '123456';
-      if (code !== expectedCode) {
-        throw new Error('Invalid verification code');
-      }
+      // Call real API
+      await authApi.verifyPhone(verificationData.phone, code);
       
       setVerificationData(prev => prev ? {
         ...prev,
@@ -127,6 +130,15 @@ export function PhoneVerificationProvider({ children }: { children: React.ReactN
     setStep('phone');
   };
 
+  const setInitialPhone = (phone: string) => {
+    setVerificationData({
+      phone,
+      code: '',
+      isVerified: false
+    });
+    setStep('code');
+  };
+
   const value: PhoneVerificationContextType = {
     verificationData,
     isLoading,
@@ -135,7 +147,8 @@ export function PhoneVerificationProvider({ children }: { children: React.ReactN
     sendVerificationCode,
     verifyCode,
     resendCode,
-    resetVerification
+    resetVerification,
+    setInitialPhone
   };
 
   return (

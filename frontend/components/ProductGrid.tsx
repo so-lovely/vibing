@@ -14,22 +14,17 @@ import {
 
 export function ProductGrid() {
   const {
-    filteredProducts,
+    products,
     loading,
+    error,
     currentPage,
     setCurrentPage,
-    itemsPerPage,
     totalPages,
-    toggleProductLike
+    toggleLike
   } = useProducts();
 
-  // Get products for current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentProducts = filteredProducts.slice(startIndex, endIndex);
-
   const handleProductLike = (productId: string) => {
-    toggleProductLike(productId);
+    toggleLike(productId);
   };
 
   if (loading) {
@@ -55,12 +50,28 @@ export function ProductGrid() {
     );
   }
 
+  if (error) {
+    return (
+      <section className="py-6 px-4">
+        <div className="space-y-6">
+          <ProductFilters />
+          <div className="text-center py-12">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold mb-2 text-red-600">오류가 발생했습니다</h3>
+              <p className="text-muted-foreground">{error}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-6 px-4">
       <div className="space-y-6">
         <ProductFilters />
 
-        {currentProducts.length === 0 ? (
+        {products.length === 0 ? (
           <div className="text-center py-12">
             <div className="mb-4">
               <h3 className="text-lg font-semibold mb-2">검색 결과가 없습니다</h3>
@@ -73,7 +84,7 @@ export function ProductGrid() {
           <>
             {/* Products Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {currentProducts.map((product) => (
+              {products.map((product) => (
                 <div key={product.id} onClick={() => handleProductLike(product.id)}>
                   <ProductCard {...product} />
                 </div>

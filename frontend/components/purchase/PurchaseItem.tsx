@@ -1,4 +1,4 @@
-import { PurchaseHistoryItem } from '../../data/purchases/mockData';
+import type { PurchaseHistoryItem } from '../../types/purchase';
 import { usePurchase } from '../../contexts/PurchaseContext';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
@@ -59,9 +59,6 @@ export function PurchaseItem({ purchase }: PurchaseItemProps) {
               <p className="text-gray-600 text-sm mb-2">
                 by {purchase.product.author}
               </p>
-              <p className="text-gray-700 line-clamp-2">
-                {purchase.product.description}
-              </p>
             </div>
             
             <div className="flex flex-col items-start lg:items-end gap-2">
@@ -69,11 +66,6 @@ export function PurchaseItem({ purchase }: PurchaseItemProps) {
               <div className="text-2xl font-bold text-gray-900">
                 ${purchase.price.toFixed(2)}
               </div>
-              {purchase.isSubscription && (
-                <Badge variant="outline" className="text-xs">
-                  구독
-                </Badge>
-              )}
             </div>
           </div>
 
@@ -97,17 +89,6 @@ export function PurchaseItem({ purchase }: PurchaseItemProps) {
           </div>
 
 
-          {/* Subscription Info */}
-          {purchase.isSubscription && purchase.subscriptionExpiresAt && (
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="text-sm">
-                <span className="font-medium text-blue-800">구독 만료일:</span>
-                <span className="text-blue-700 ml-2">
-                  {formatDate(purchase.subscriptionExpiresAt)}
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 pt-2">

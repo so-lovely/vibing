@@ -1,5 +1,5 @@
 import { usePurchase } from '../../contexts/PurchaseContext';
-import { purchaseStatuses, purchaseSortOptions } from '../../data/purchases/mockData';
+import { purchaseStatuses, purchaseSortOptions } from '../../constants/purchase';
 import { Card } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Filter, SortAsc } from 'lucide-react';

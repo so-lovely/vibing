@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { Product } from '../data/products/mockData';
-import { PurchaseHistoryItem, mockPurchases } from '../data/purchases/mockData';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { purchaseApi } from '../services/purchaseApi';
+import type { PurchaseHistoryItem, Product } from '../types/purchase';
 
 interface PurchaseFormData {
   email: string;
@@ -19,12 +19,22 @@ interface PurchaseContextType {
   filteredHistory: PurchaseHistoryItem[];
   statusFilter: string;
   sortBy: string;
+  loading: boolean;
+  error: string | null;
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  } | null;
   updateFormData: (field: string, value: string) => void;
   processPurchase: (product: Product) => Promise<void>;
   resetPurchase: () => void;
   setStatusFilter: (status: string) => void;
   setSortBy: (sort: string) => void;
-  downloadProduct: (purchaseId: string) => void;
+  downloadProduct: (purchaseId: string) => Promise<void>;
+  loadPurchaseHistory: (page?: number) => Promise<void>;
+  generateLicense: (purchaseId: string) => Promise<void>;
 }
 
 const PurchaseContext = createContext<PurchaseContextType | undefined>(undefined);
@@ -41,9 +51,41 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPurchased, setIsPurchased] = useState(false);
-  const [purchaseHistory] = useState<PurchaseHistoryItem[]>(mockPurchases);
+  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<{
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  } | null>(null);
+
+  // Load purchase history from API
+  const loadPurchaseHistory = async (page = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await purchaseApi.getPurchaseHistory(page, 10);
+      setPurchaseHistory(response.purchases || []);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load purchase history');
+      // Don't set purchaseHistory to null on error, keep existing data
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    const token = localStorage.getItem('auth-token');
+    if (token) {
+      loadPurchaseHistory();
+    }
+  }, []);
 
   const updateFormData = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -51,20 +93,24 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
 
   const processPurchase = async (product: Product) => {
     setIsProcessing(true);
-    
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // In a real app, we would add the product to purchase history
-    console.log('Processing purchase for:', product.title);
-    
-    setIsProcessing(false);
-    setIsPurchased(true);
+    try {
+      // TODO: Implement actual payment processing with backend
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Processing purchase for:', product.title);
+      setIsPurchased(true);
+      // Reload purchase history after successful purchase
+      await loadPurchaseHistory();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Payment processing failed');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const resetPurchase = () => {
     setIsPurchased(false);
     setIsProcessing(false);
+    setError(null);
     setFormData({
       email: '',
       cardNumber: '',
@@ -75,8 +121,33 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const downloadProduct = async (purchaseId: string) => {
+    try {
+      const response = await purchaseApi.getDownloadUrl(purchaseId);
+      window.open(response.downloadUrl, '_blank');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get download URL');
+    }
+  };
+
+  const generateLicense = async (purchaseId: string) => {
+    try {
+      const response = await purchaseApi.generateLicense(purchaseId);
+      // Update the purchase in history with new license key
+      setPurchaseHistory(prev => 
+        prev.map(purchase => 
+          purchase.id === purchaseId 
+            ? { ...purchase, licenseKey: response.licenseKey }
+            : purchase
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate license');
+    }
+  };
+
   // Filter and sort purchase history
-  const filteredHistory = purchaseHistory
+  const filteredHistory = (purchaseHistory || [])
     .filter(purchase => {
       if (statusFilter === 'all') return true;
       return purchase.status === statusFilter;
@@ -98,13 +169,6 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       }
     });
 
-  const downloadProduct = (purchaseId: string) => {
-    const purchase = purchaseHistory.find(p => p.id === purchaseId);
-    if (purchase?.downloadUrl) {
-      // In a real app, this would handle the download
-      window.open(purchase.downloadUrl, '_blank');
-    }
-  };
 
   return (
     <PurchaseContext.Provider value={{
@@ -115,12 +179,17 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
       filteredHistory,
       statusFilter,
       sortBy,
+      loading,
+      error,
+      pagination,
       updateFormData,
       processPurchase,
       resetPurchase,
       setStatusFilter,
       setSortBy,
-      downloadProduct
+      downloadProduct,
+      loadPurchaseHistory,
+      generateLicense
     }}>
       {children}
     </PurchaseContext.Provider>

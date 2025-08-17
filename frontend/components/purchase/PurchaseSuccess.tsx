@@ -1,7 +1,7 @@
 import { Download, Check } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface PurchaseSuccessProps {
   product: Product;

@@ -31,7 +31,8 @@ export function UserMenu() {
     }
   };
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | undefined) => {
+    if (!name || !name.trim()) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
@@ -57,17 +58,17 @@ export function UserMenu() {
         <Button variant="ghost" className="relative h-10 rounded-full pl-2 pr-3 cursor-pointer">
           <div className="flex items-center space-x-2">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarImage src={user.avatar} alt={user.name || 'User'} />
               <AvatarFallback className="text-xs">
                 {getInitials(user.name)}
               </AvatarFallback>
             </Avatar>
             <div className="hidden sm:flex flex-col items-start text-left">
               <span className="text-sm font-medium truncate max-w-24">
-                {user.name}
+                {user.name || 'User'}
               </span>
-              <Badge variant="outline" className={`text-xs h-4 px-1 ${getRoleBadgeColor(user.role)}`}>
-                {getRoleLabel(user.role)}
+              <Badge variant="outline" className={`text-xs h-4 px-1 ${getRoleBadgeColor(user.role || 'buyer')}`}>
+                {getRoleLabel(user.role || 'buyer')}
               </Badge>
             </div>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -78,27 +79,27 @@ export function UserMenu() {
       <DropdownMenuContent className="w-56 z-50" align="end" sideOffset={8}>
         <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1 leading-none">
-            <p className="font-medium text-sm">{user.name}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <p className="font-medium text-sm">{user.name || 'User'}</p>
+            <p className="text-xs text-muted-foreground">{user.email || 'No email'}</p>
           </div>
         </div>
         
         <DropdownMenuSeparator />
-        {user.role ==='seller' && (
+        {(user.role || 'buyer') === 'seller' && (
         <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/profile')}>
           <User className="mr-2 h-4 w-4" />
           <span>프로필</span>
         </DropdownMenuItem>
         )}
         
-        {user.role === 'buyer' && (
+        {(user.role || 'buyer') === 'buyer' && (
         <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/purchases')}>
           <ShoppingBag className="mr-2 h-4 w-4" />
           <span>구매 내역</span>
         </DropdownMenuItem>
         )}
         
-        {user.role === 'seller' && (
+        {(user.role || 'buyer') === 'seller' && (
           <>
             <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/sell')}>
               <Package className="mr-2 h-4 w-4" />
@@ -107,7 +108,7 @@ export function UserMenu() {
           </>
         )}
         
-        {user.role === 'admin' && (
+        {(user.role || 'buyer') === 'admin' && (
           <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/admin')}>
             <Settings className="mr-2 h-4 w-4" />
             <span>관리자 패널</span>

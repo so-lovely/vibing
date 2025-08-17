@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useAdmin } from '../../contexts/AdminContext';
-import { User } from '../../data/auth/mockData';
+import type { User } from '../../types/auth';
 
 export function UserManagement() {
   const { users, loading, updateUserRole, deleteUser } = useAdmin();

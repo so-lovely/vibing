@@ -1,14 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { User } from '../data/auth/mockData';
-import { Product } from '../data/products/mockData';
-
-export interface AdminStats {
-  totalUsers: number;
-  totalProducts: number;
-  totalSales: number;
-  totalRevenue: number;
-  monthlyGrowth: number;
-}
+import { adminApi, type AdminStats } from '../services/adminApi';
+import type { User } from '../types/auth';
+import type { Product } from '../types/product';
 
 
 interface AdminContextType {
@@ -16,6 +9,7 @@ interface AdminContextType {
   products: Product[];
   stats: AdminStats;
   loading: boolean;
+  error: string | null;
   fetchUsers: () => Promise<void>;
   fetchProducts: () => Promise<void>;
   fetchStats: () => Promise<void>;
@@ -38,48 +32,18 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     monthlyGrowth: 0
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Mock API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // In real app, this would be an API call
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          email: 'developer@example.com',
-          name: 'John Developer',
-          role: 'buyer',
-          createdAt: '2024-01-15T10:00:00Z'
-        },
-        {
-          id: '2',
-          email: 'seller@example.com',
-          name: 'Jane Seller',
-          role: 'seller',
-          createdAt: '2024-01-10T10:00:00Z'
-        },
-        {
-          id: '3',
-          email: 'admin@vibing.com',
-          name: 'Admin User',
-          role: 'admin',
-          createdAt: '2024-01-01T10:00:00Z'
-        },
-        {
-          id: '4',
-          email: 'newuser@example.com',
-          name: 'New User',
-          role: 'buyer',
-          createdAt: '2024-02-01T10:00:00Z'
-        }
-      ];
-      
-      setUsers(mockUsers);
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
+      const users = await adminApi.getUsers();
+      setUsers(users);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch users';
+      setError(errorMessage);
+      console.error('Failed to fetch users:', err);
     } finally {
       setLoading(false);
     }
@@ -87,14 +51,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const fetchProducts = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Import from existing product data
-      const { mockProducts } = await import('../data/products/mockData');
-      setProducts(mockProducts);
-    } catch (error) {
-      console.error('Failed to fetch products:', error);
+      const products = await adminApi.getProducts();
+      setProducts(products);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch products';
+      setError(errorMessage);
+      console.error('Failed to fetch products:', err);
     } finally {
       setLoading(false);
     }
@@ -102,20 +66,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const fetchStats = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const mockStats: AdminStats = {
-        totalUsers: 156,
-        totalProducts: 48,
-        totalSales: 1247,
-        totalRevenue: 89420,
-        monthlyGrowth: 12.5
-      };
-      
-      setStats(mockStats);
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
+      const stats = await adminApi.getStats();
+      setStats(stats);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch stats';
+      setError(errorMessage);
+      console.error('Failed to fetch stats:', err);
     } finally {
       setLoading(false);
     }
@@ -124,11 +82,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const updateUserRole = async (userId: string, role: 'buyer' | 'seller' | 'admin') => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      const updatedUser = await adminApi.updateUserRole(userId, role);
       setUsers(prevUsers => 
         prevUsers.map(user => 
-          user.id === userId ? { ...user, role } : user
+          user.id === userId ? updatedUser : user
         )
       );
     } catch (error) {
@@ -139,8 +96,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const deleteUser = async (userId: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      await adminApi.deleteUser(userId);
       setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     } catch (error) {
       console.error('Failed to delete user:', error);
@@ -150,8 +106,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const deleteProduct = async (productId: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      await adminApi.deleteProduct(productId);
       setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
     } catch (error) {
       console.error('Failed to delete product:', error);
@@ -161,11 +116,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const approveProduct = async (productId: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      const updatedProduct = await adminApi.updateProductStatus(productId, 'approved');
       setProducts(prevProducts => 
         prevProducts.map(product => 
-          product.id === productId ? { ...product, status: 'approved' } : product
+          product.id === productId ? updatedProduct : product
         )
       );
     } catch (error) {
@@ -179,6 +133,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     products,
     stats,
     loading,
+    error,
     fetchUsers,
     fetchProducts,
     fetchStats,

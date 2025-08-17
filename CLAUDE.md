@@ -1,0 +1,2 @@
+- Don't make long files.Divide by each directory
+- Use already configured backend api

@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { categories } from '../../data/products/mockData';
+import { categories } from '../../constants/products';
 
 interface ProductEditFormProps {
   formData: {

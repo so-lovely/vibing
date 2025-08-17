@@ -20,7 +20,7 @@ export function PhoneVerificationPage({
   title = "Phone Verification",
   description = "Please verify your phone number to continue with registration"
 }: PhoneVerificationPageProps) {
-  const { step } = usePhoneVerification();
+  const { step, verificationData } = usePhoneVerification();
 
   const renderContent = () => {
     switch (step) {
@@ -33,6 +33,13 @@ export function PhoneVerificationPage({
       default:
         return <PhoneInputForm />;
     }
+  };
+
+  const getDescription = () => {
+    if (step === 'code' && verificationData?.phone) {
+      return `Enter the 6-digit code sent to ${verificationData.phone}`;
+    }
+    return description;
   };
 
   return (
@@ -56,7 +63,7 @@ export function PhoneVerificationPage({
             </div>
             <CardTitle className="text-2xl">{title}</CardTitle>
             <CardDescription className="text-center">
-              {description}
+              {getDescription()}
             </CardDescription>
           </CardHeader>
           <CardContent>

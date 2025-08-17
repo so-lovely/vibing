@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, mockAuth } from '../data/auth/mockData';
+import { authApi } from '../services/authApi';
+import type { User } from '../types/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -26,14 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const savedUser = localStorage.getItem('auth-user');
 
         if (savedToken && savedUser) {
-          // Verify token is still valid
-          const currentUser = await mockAuth.getCurrentUser(savedToken);
-          
-          if (currentUser) {
+          try {
+            // Verify token is still valid
+            const currentUser = await authApi.getCurrentUser();
             setUser(currentUser);
             setToken(savedToken);
-          } else {
+          } catch (error) {
             // Token invalid, clear storage
+            console.error('Token validation failed:', error);
             localStorage.removeItem('auth-token');
             localStorage.removeItem('auth-user');
           }
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const result = await mockAuth.login({ email, password });
+      const result = await authApi.login({ email, password });
       setUser(result.user);
       setToken(result.token);
       localStorage.setItem('auth-token', result.token);
@@ -64,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (email: string, password: string, name: string, role: 'buyer' | 'seller', phone: string, phoneVerified: boolean) => {
     try {
-      const result = await mockAuth.signup({ email, password, name, role, phone, phoneVerified });
+      // Normalize phone number to e164 format (remove spaces)
+      const normalizedPhone = phone.replace(/\s+/g, '');
+      const result = await authApi.signup({ email, password, name, role, phone: normalizedPhone, phoneVerified });
       setUser(result.user);
       setToken(result.token);
       localStorage.setItem('auth-token', result.token);
@@ -76,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await mockAuth.logout();
+      await authApi.logout();
       setUser(null);
       setToken(null);
       localStorage.removeItem('auth-token');

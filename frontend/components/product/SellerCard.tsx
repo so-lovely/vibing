@@ -2,7 +2,7 @@ import { User, Star, Package, MessageCircle, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ContactSellerButton } from '../ContactSellerButton';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface SellerCardProps {
   product: Product;

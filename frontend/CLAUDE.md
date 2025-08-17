@@ -8,7 +8,6 @@ State/Data fetching: TanStack Query (react-query) + React Context or Zustand
 Backend: Go (Golang) + Fiber
 DB: PostgreSQL
 파일저장: S3 호환 (AWS S3 / DigitalOcean Spaces)
-캐시/세션: Redis
 결제/구독: Stripe (국내 상황에 따라 Paddle 고려)
 인증: JWT + refresh token / OAuth (GitHub, Google)
 배포: Docker + CI (GitHub Actions) → AWS ECS/Fargate 또는 Render / Vercel(프론트)

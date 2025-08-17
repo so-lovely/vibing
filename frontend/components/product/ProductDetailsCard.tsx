@@ -2,7 +2,7 @@ import { Tag, Shield, Clock, ExternalLink } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
-import { Product } from '../../data/products/mockData';
+import type { Product } from '../../types/product';
 
 interface ProductDetailsCardProps {
   product: Product;

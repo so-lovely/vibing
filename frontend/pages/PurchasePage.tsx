@@ -7,7 +7,8 @@ import { PaymentForm } from '../components/purchase/PaymentForm';
 import { PurchaseSuccess } from '../components/purchase/PurchaseSuccess';
 import { PurchaseProvider, usePurchase } from '../contexts/PurchaseContext';
 import { useAuth } from '../contexts/AuthContext';
-import { mockProducts, type Product } from '../data/products/mockData';
+import type { Product } from '../types/product';
+import { productApi } from '../services/productApi';
 
 function PurchasePageContent() {
   const { id } = useParams<{ id: string }>();
@@ -18,8 +19,12 @@ function PurchasePageContent() {
 
   useEffect(() => {
     if (id) {
-      const foundProduct = mockProducts.find(p => p.id === id);
-      setProduct(foundProduct || null);
+      productApi.getProduct(id)
+        .then(setProduct)
+        .catch((error) => {
+          console.error('Failed to fetch product:', error);
+          setProduct(null);
+        });
     }
   }, [id]);
 
