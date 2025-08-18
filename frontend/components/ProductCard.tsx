@@ -4,6 +4,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
 import { ImageWithFallback } from "./ui/image-with-fallback";
+import { convertUsdToKrw, formatPrice } from "../utils/purchaseUtils";
 
 interface ProductCardProps {
   id: string;
@@ -99,11 +100,11 @@ export function ProductCard({
           <div className="flex items-center space-x-2">
             {originalPrice && (
               <span className="text-sm text-muted-foreground line-through">
-                ${originalPrice}
+                {formatPrice(convertUsdToKrw(originalPrice))}
               </span>
             )}
             <span className="text-lg font-bold">
-              {price === 0 ? 'Free' : `$${price}`}
+              {price === 0 ? 'Free' : formatPrice(convertUsdToKrw(price))}
             </span>
           </div>
           <div className="flex space-x-2">

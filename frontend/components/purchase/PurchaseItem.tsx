@@ -2,8 +2,9 @@ import type { PurchaseHistoryItem } from '../../types/purchase';
 import { usePurchase } from '../../contexts/PurchaseContext';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { ProductInfo } from './ProductInfo';
-import { getStatusBadge } from '../../utils/purchaseUtils';
+import { getStatusBadgeProps } from '../../utils/purchaseUtils';
 import { Download, Calendar, CreditCard, ExternalLink } from 'lucide-react';
 
 interface PurchaseItemProps {
@@ -39,7 +40,14 @@ export function PurchaseItem({ purchase }: PurchaseItemProps) {
             </div>
             
             <div className="flex flex-col items-start lg:items-end gap-2">
-              {getStatusBadge(purchase.status)}
+              {(() => {
+                const badgeProps = getStatusBadgeProps(purchase.status);
+                return (
+                  <Badge variant={badgeProps.variant} className={badgeProps.className}>
+                    {badgeProps.text}
+                  </Badge>
+                );
+              })()}
             </div>
           </div>
 

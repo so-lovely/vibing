@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { purchaseApi } from '../services/purchaseApi';
+import { usePayment } from '../hooks/usePayment';
 import type { PurchaseHistoryItem, Product } from '../types/purchase';
 
 interface PurchaseFormData {
@@ -40,6 +41,13 @@ interface PurchaseContextType {
 const PurchaseContext = createContext<PurchaseContextType | undefined>(undefined);
 
 export function PurchaseProvider({ children }: { children: ReactNode }) {
+  const { 
+    isProcessing: paymentProcessing, 
+    error: paymentError, 
+    processPayment, 
+    clearError: clearPaymentError 
+  } = usePayment();
+  
   const [formData, setFormData] = useState<PurchaseFormData>({
     email: '',
     cardNumber: '',
@@ -92,14 +100,26 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   };
 
   const processPurchase = async (product: Product) => {
+    if (!formData.email) {
+      setError('Email is required for payment');
+      return;
+    }
+
     setIsProcessing(true);
+    clearPaymentError();
+    
     try {
-      // TODO: Implement actual payment processing with backend
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('Processing purchase for:', product.title);
-      setIsPurchased(true);
-      // Reload purchase history after successful purchase
-      await loadPurchaseHistory();
+      // Process payment with Toss Pay via Iamport
+      const result = await processPayment(product, formData.email);
+      
+      if (result.success) {
+        console.log('Payment completed:', result);
+        setIsPurchased(true);
+        // Reload purchase history after successful purchase
+        await loadPurchaseHistory();
+      } else {
+        setError(result.errorMessage || 'Payment failed');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment processing failed');
     } finally {
@@ -111,6 +131,7 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
     setIsPurchased(false);
     setIsProcessing(false);
     setError(null);
+    clearPaymentError();
     setFormData({
       email: '',
       cardNumber: '',
@@ -173,14 +194,14 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
   return (
     <PurchaseContext.Provider value={{
       formData,
-      isProcessing,
+      isProcessing: isProcessing || paymentProcessing,
       isPurchased,
       purchaseHistory,
       filteredHistory,
       statusFilter,
       sortBy,
       loading,
-      error,
+      error: error || paymentError,
       pagination,
       updateFormData,
       processPurchase,

@@ -7,6 +7,7 @@ import { Card, CardContent } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { ImageWithFallback } from '../ui/image-with-fallback';
 import { ContactSellerButton } from '../ContactSellerButton';
+import { convertUsdToKrw, formatPrice } from '../../utils/purchaseUtils';
 import type { Product } from '../../types/product';
 
 interface ProductImageCardProps {
@@ -60,11 +61,11 @@ export function ProductImageCard({ product }: ProductImageCardProps) {
             <div className="flex items-center justify-center space-x-2 mb-2">
               {product.originalPrice && (
                 <span className="text-lg text-muted-foreground line-through">
-                  ${product.originalPrice}
+                  {formatPrice(convertUsdToKrw(product.originalPrice))}
                 </span>
               )}
               <span className="text-3xl font-bold">
-                {product.price === 0 ? 'Free' : `$${product.price}`}
+                {product.price === 0 ? 'Free' : formatPrice(convertUsdToKrw(product.price))}
               </span>
             </div>
             

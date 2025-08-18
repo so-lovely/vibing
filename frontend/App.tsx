@@ -16,6 +16,7 @@ import { SellPage } from './pages/SellPage';
 import { AdminPage } from './pages/AdminPage';
 import { PhoneVerificationPage } from './pages/PhoneVerificationPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { ChatWidget } from './components/chat/ChatWidget';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
                   <Route path="/categories" element={<ProductsPage />} />
                   <Route path="/product/:id" element={<ProductDescriptionPage />} />
                   <Route path="/purchase/:id" element={<PurchasePage />} />
+                  <Route path="/purchase/success" element={<PaymentSuccessPage />} />
                   <Route path="/purchases" element={<PurchaseHistoryPage />} />
                   <Route path="/sell" element={<SellPage />} />
                   <Route path="/admin" element={<AdminPage />} />

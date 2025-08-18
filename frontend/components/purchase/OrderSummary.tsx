@@ -2,7 +2,7 @@ import { Shield, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { ProductInfo } from './ProductInfo';
-import { PROCESSING_FEE, calculateTotal, formatPrice } from '../../utils/purchaseUtils';
+import { PROCESSING_FEE, calculateTotal, formatPrice, convertUsdToKrw } from '../../utils/purchaseUtils';
 import type { Product } from '../../types/product';
 
 interface OrderSummaryProps {
@@ -10,6 +10,7 @@ interface OrderSummaryProps {
 }
 
 export function OrderSummary({ product }: OrderSummaryProps) {
+  const productPriceKrw = convertUsdToKrw(product.price);
   const total = calculateTotal(product.price);
 
   return (
@@ -25,7 +26,7 @@ export function OrderSummary({ product }: OrderSummaryProps) {
         <div className="space-y-2">
           <div className="flex justify-between">
             <span>Price</span>
-            <span>{formatPrice(product.price)}</span>
+            <span>{formatPrice(productPriceKrw)}</span>
           </div>
           <div className="flex justify-between">
             <span>Processing Fee</span>

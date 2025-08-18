@@ -3,6 +3,7 @@ import { purchaseStatuses, purchaseSortOptions } from '../../constants/purchase'
 import { Card } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Filter, SortAsc } from 'lucide-react';
+import { convertUsdToKrw, formatPrice } from '../../utils/purchaseUtils';
 
 export function PurchaseFilters() {
   const { statusFilter, sortBy, setStatusFilter, setSortBy, filteredHistory, purchaseHistory } = usePurchase();
@@ -71,7 +72,7 @@ export function PurchaseFilters() {
           <div className="flex justify-between">
             <span>총 구매액:</span>
             <span className="font-medium">
-              ${purchaseHistory.reduce((sum, purchase) => sum + purchase.price, 0).toFixed(2)}
+              {formatPrice(convertUsdToKrw(purchaseHistory.reduce((sum, purchase) => sum + purchase.price, 0)))}
             </span>
           </div>
         </div>

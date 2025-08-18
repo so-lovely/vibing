@@ -14,7 +14,7 @@ function PurchasePageContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { formData, isProcessing, isPurchased, updateFormData, processPurchase, resetPurchase } = usePurchase();
+  const { formData, isProcessing, isPurchased, error, updateFormData, processPurchase, resetPurchase } = usePurchase();
   const [product, setProduct] = useState<Product | null>(null);
 
   useEffect(() => {
@@ -87,6 +87,7 @@ function PurchasePageContent() {
           onInputChange={updateFormData}
           onPurchase={handlePurchase}
           isProcessing={isProcessing}
+          error={error}
         />
       </div>
     </main>

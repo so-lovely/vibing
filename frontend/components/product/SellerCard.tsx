@@ -74,18 +74,6 @@ export function SellerCard({ product }: SellerCardProps) {
           </span>
         </div>
 
-        {/* Contact Seller Button */}
-        <ContactSellerButton
-          sellerId={product.authorId}
-          sellerName={product.author}
-          productId={product.id}
-          productName={product.title}
-          variant="default"
-          size="default"
-          className="w-full"
-        >
-          판매자에게 문의하기
-        </ContactSellerButton>
 
         {/* Additional Info */}
         <div className="text-xs text-muted-foreground text-center pt-2 border-t">

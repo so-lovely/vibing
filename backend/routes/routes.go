@@ -73,6 +73,7 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	purchaseRoutes.Get("/:id/download", handlers.GetDownloadURL)
 	purchaseRoutes.Get("/check/:productId", handlers.CheckPurchaseStatus)
 	purchaseRoutes.Post("/:id/generate-license", handlers.GenerateLicense)
+	purchaseRoutes.Post("/:id/dispute", handlers.RequestDispute)
 
 	// Seller routes
 	sellerRoutes := api.Group("/seller")
@@ -102,6 +103,9 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	adminRoutes.Get("/products", handlers.GetAdminProducts)
 	adminRoutes.Put("/products/:id/status", handlers.UpdateProductStatus)
 	adminRoutes.Get("/sales", handlers.GetAdminSales)
+	adminRoutes.Get("/disputes", handlers.GetDisputedPurchases)
+	adminRoutes.Put("/disputes/:id/process", handlers.ProcessDispute)
+	adminRoutes.Put("/disputes/:id/resolve", handlers.ResolveDispute)
 
 	// Upload routes with rate limiting
 	uploadRoutes := api.Group("/upload")

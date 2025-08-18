@@ -12,12 +12,15 @@ import (
 
 // Common errors
 var (
-	ErrDownloadNotAllowed = errors.New("download not allowed")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound      = errors.New("user not found")
-	ErrProductNotFound   = errors.New("product not found")
-	ErrUnauthorized      = errors.New("unauthorized")
-	ErrForbidden         = errors.New("forbidden")
+	ErrDownloadNotAllowed    = errors.New("download not allowed")
+	ErrInvalidCredentials    = errors.New("invalid credentials")
+	ErrUserNotFound         = errors.New("user not found")
+	ErrProductNotFound      = errors.New("product not found")
+	ErrUnauthorized         = errors.New("unauthorized")
+	ErrForbidden            = errors.New("forbidden")
+	ErrDisputeNotAllowed    = errors.New("dispute not allowed")
+	ErrInvalidDisputeStatus = errors.New("invalid dispute status")
+	ErrAutoConfirmNotAllowed = errors.New("auto-confirm not allowed")
 )
 
 // generateUUID generates a new UUID string

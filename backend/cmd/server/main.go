@@ -11,6 +11,7 @@ import (
 	"vibing-backend/config"
 	"vibing-backend/database"
 	"vibing-backend/routes"
+	"vibing-backend/services"
 )
 
 func main() {
@@ -29,6 +30,10 @@ func main() {
 	if err := database.Migrate(); err != nil {
 		log.Fatal("Failed to run migrations:", err)
 	}
+
+	// Initialize scheduler for auto-confirmations and dispute processing
+	services.InitScheduler()
+	defer services.StopScheduler()
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{

@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { MoreHorizontal, Trash2, Check, Eye, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useAdmin } from '../../contexts/AdminContext';
+import { convertUsdToKrw, formatPrice } from '../../utils/purchaseUtils';
 import type { Product } from '../../types/product';
 
 export function ProductManagement() {
@@ -97,7 +98,7 @@ export function ProductManagement() {
                 <TableCell>
                   <Badge variant="outline">{product.category}</Badge>
                 </TableCell>
-                <TableCell>${product.price}</TableCell>
+                <TableCell>{formatPrice(convertUsdToKrw(product.price))}</TableCell>
                 <TableCell>
                   <Badge className={getStatusBadgeColor(product.status || 'approved')}>
                     {product.status || 'approved'}
@@ -155,7 +156,7 @@ export function ProductManagement() {
                       </p>
                       <p className="mb-4">{viewingProduct.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold">${viewingProduct.price}</span>
+                        <span className="text-2xl font-bold">{formatPrice(convertUsdToKrw(viewingProduct.price))}</span>
                         <div className="flex space-x-2">
                           {viewingProduct.tags.map((tag, index) => (
                             <Badge key={index} variant="secondary">{tag}</Badge>

@@ -23,10 +23,6 @@ export function PurchaseSuccess({ product, onContinueShopping }: PurchaseSuccess
             Thank you for purchasing <strong>{product.title}</strong>
           </p>
           <div className="flex flex-col space-y-2">
-            <Button className="w-full">
-              <Download className="w-4 h-4 mr-2" />
-              Download Now
-            </Button>
             <Button variant="outline" onClick={onContinueShopping}>
               Continue Shopping
             </Button>

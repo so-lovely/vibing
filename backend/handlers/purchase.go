@@ -67,6 +67,18 @@ func GetPurchaseHistory(c *fiber.Ctx) error {
 			purchaseData["licenseKey"] = *purchase.LicenseKey
 		}
 		
+		// Add dispute information
+		purchaseData["displayStatus"] = purchase.GetDisplayStatus()
+		purchaseData["canRequestDispute"] = purchase.CanRequestDispute()
+		
+		if purchase.DisputeReason != nil {
+			purchaseData["disputeReason"] = *purchase.DisputeReason
+		}
+		
+		if daysUntilConfirm := purchase.GetDaysUntilAutoConfirm(); daysUntilConfirm != nil {
+			purchaseData["daysUntilAutoConfirm"] = *daysUntilConfirm
+		}
+		
 		purchaseHistory = append(purchaseHistory, purchaseData)
 	}
 	
@@ -278,5 +290,261 @@ func CheckPurchaseStatus(c *fiber.Ctx) error {
 		"purchaseId":  purchase.ID,
 		"licenseKey":  purchase.LicenseKey,
 		"downloadUrl": purchase.DownloadURL,
+	})
+}
+
+// RequestDispute allows user to request dispute for a purchase
+func RequestDispute(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	purchaseID := c.Params("id")
+	
+	var req struct {
+		Reason string `json:"reason" validate:"required,min=10,max=500"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INVALID_REQUEST",
+				"message": "Invalid request body",
+			},
+		})
+	}
+	
+	var purchase models.Purchase
+	if err := database.DB.Where("id = ? AND user_id = ?", purchaseID, user.ID).
+		First(&purchase).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Purchase not found",
+			},
+		})
+	}
+	
+	// Request dispute
+	if err := purchase.RequestDispute(req.Reason); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "DISPUTE_NOT_ALLOWED",
+				"message": err.Error(),
+			},
+		})
+	}
+	
+	// Save the updated purchase
+	if err := database.DB.Save(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to request dispute",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"message": "Dispute requested successfully",
+		"purchase": fiber.Map{
+			"id":          purchase.ID,
+			"status":      purchase.Status,
+			"displayStatus": purchase.GetDisplayStatus(),
+		},
+	})
+}
+
+// ProcessDispute processes a dispute (admin only)
+func ProcessDispute(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	if user.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "Admin access required",
+			},
+		})
+	}
+	
+	purchaseID := c.Params("id")
+	
+	var purchase models.Purchase
+	if err := database.DB.Where("id = ?", purchaseID).First(&purchase).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Purchase not found",
+			},
+		})
+	}
+	
+	if err := purchase.ProcessDispute(); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INVALID_DISPUTE_STATUS",
+				"message": err.Error(),
+			},
+		})
+	}
+	
+	if err := database.DB.Save(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to process dispute",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"message": "Dispute processed successfully",
+		"purchase": fiber.Map{
+			"id":          purchase.ID,
+			"status":      purchase.Status,
+			"displayStatus": purchase.GetDisplayStatus(),
+		},
+	})
+}
+
+// ResolveDispute resolves a dispute (admin only)
+func ResolveDispute(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	if user.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "Admin access required",
+			},
+		})
+	}
+	
+	purchaseID := c.Params("id")
+	
+	var req struct {
+		Resolution string `json:"resolution" validate:"required,min=10,max=1000"`
+		Refund     bool   `json:"refund"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INVALID_REQUEST",
+				"message": "Invalid request body",
+			},
+		})
+	}
+	
+	var purchase models.Purchase
+	if err := database.DB.Where("id = ?", purchaseID).First(&purchase).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Purchase not found",
+			},
+		})
+	}
+	
+	if err := purchase.ResolveDispute(req.Resolution, req.Refund); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INVALID_DISPUTE_STATUS",
+				"message": err.Error(),
+			},
+		})
+	}
+	
+	if err := database.DB.Save(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to resolve dispute",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"message": "Dispute resolved successfully",
+		"purchase": fiber.Map{
+			"id":          purchase.ID,
+			"status":      purchase.Status,
+			"displayStatus": purchase.GetDisplayStatus(),
+			"refunded":    req.Refund,
+		},
+	})
+}
+
+// GetDisputedPurchases returns all purchases with active disputes (admin only)
+func GetDisputedPurchases(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	if user.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "Admin access required",
+			},
+		})
+	}
+	
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	offset := (page - 1) * limit
+	
+	var purchases []models.Purchase
+	var total int64
+	
+	// Get disputed purchases
+	query := database.DB.Model(&models.Purchase{}).
+		Where("status IN ?", []string{"dispute_requested", "dispute_processing"})
+	
+	query.Count(&total)
+	
+	if err := query.Preload("Product").Preload("User").
+		Order("dispute_requested_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&purchases).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to fetch disputed purchases",
+			},
+		})
+	}
+	
+	var disputedPurchases []fiber.Map
+	for _, purchase := range purchases {
+		disputeData := fiber.Map{
+			"id":             purchase.ID,
+			"orderId":        purchase.OrderID,
+			"price":          purchase.Price,
+			"status":         purchase.Status,
+			"displayStatus":  purchase.GetDisplayStatus(),
+			"disputeReason":  purchase.DisputeReason,
+			"disputeRequestedAt": purchase.DisputeRequestedAt,
+			"shouldPlatformIntervene": purchase.ShouldPlatformIntervene(),
+			"user": fiber.Map{
+				"id":    purchase.User.ID,
+				"email": purchase.User.Email,
+				"name":  purchase.User.Name,
+			},
+			"product": fiber.Map{
+				"id":     purchase.Product.ID,
+				"title":  purchase.Product.Title,
+				"author": purchase.Product.Author,
+			},
+		}
+		
+		if purchase.PlatformInterventionAt != nil {
+			disputeData["platformInterventionAt"] = purchase.PlatformInterventionAt
+		}
+		
+		disputedPurchases = append(disputedPurchases, disputeData)
+	}
+	
+	return c.JSON(fiber.Map{
+		"disputes": disputedPurchases,
+		"pagination": fiber.Map{
+			"currentPage":  page,
+			"totalPages":   (total + int64(limit) - 1) / int64(limit),
+			"totalItems":   total,
+			"itemsPerPage": limit,
+		},
 	})
 }
