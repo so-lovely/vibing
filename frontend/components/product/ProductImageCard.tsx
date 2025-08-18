@@ -15,7 +15,7 @@ interface ProductImageCardProps {
 
 export function ProductImageCard({ product }: ProductImageCardProps) {
   const navigate = useNavigate();
-  const [isLiked, setIsLiked] = useState(product.isLiked || false);
+  const [isLiked, setIsLiked] = useState(false);
 
   const handlePurchase = () => {
     navigate(`/purchase/${product.id}`);
@@ -96,24 +96,24 @@ export function ProductImageCard({ product }: ProductImageCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1">
                 <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{product.rating}</span>
-                <span className="text-sm text-muted-foreground">({product.reviewCount} 리뷰)</span>
+                <span className="font-medium">{product.rating || 0}</span>
+                <span className="text-sm text-muted-foreground">({product.reviewCount || 0} 리뷰)</span>
               </div>
             </div>
             
             <div className="flex items-center space-x-2">
               <Download className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">{product.downloads.toLocaleString()} 다운로드</span>
+              <span className="text-sm">{(product.downloads || 0).toLocaleString()} 다운로드</span>
             </div>
             
             <div className="flex items-center space-x-2">
               <User className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">by {product.author}</span>
+              <span className="text-sm">by {product.author || 'Unknown'}</span>
             </div>
             
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">업데이트: {formatDate(product.updatedAt)}</span>
+              <span className="text-sm">업데이트: {product.updatedAt ? formatDate(product.updatedAt) : 'N/A'}</span>
             </div>
           </div>
         </div>

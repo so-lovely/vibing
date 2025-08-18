@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, X, ArrowLeft } from 'lucide-react';
+import { MessageCircle, X, ArrowLeft, XCircle } from 'lucide-react';
 import { useChat } from '../../contexts/ChatContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChatMessage } from './ChatMessage';
@@ -16,10 +16,13 @@ export const ChatWidget: React.FC = () => {
     isOpen, 
     isTyping, 
     unreadCount, 
+    loading,
     toggleChat, 
     sendMessage,
     selectConversation,
-    getActiveConversation
+    loadMessages,
+    getActiveConversation,
+    closeConversation
   } = useChat();
   
   const [view, setView] = useState<'list' | 'chat'>('list');
@@ -31,24 +34,41 @@ export const ChatWidget: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeConversation) {
+    if (activeConversation?.messages.length) {
       scrollToBottom();
     }
   }, [activeConversation?.messages, isTyping]);
 
   useEffect(() => {
+    // Auto-scroll when conversation is first loaded
+    if (activeConversation && activeConversation.messages.length > 0) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [activeConversationId]);
+
+  useEffect(() => {
     // Auto-switch to chat view when a conversation is selected
     if (activeConversationId && isOpen) {
       setView('chat');
+    } else if (isOpen) {
+      // Default to list view when chat opens
+      setView('list');
     }
   }, [activeConversationId, isOpen]);
 
-  const handleSelectConversation = (conversationId: string) => {
+  const handleSelectConversation = async (conversationId: string) => {
     selectConversation(conversationId);
     setView('chat');
+    // Load messages for the selected conversation
+    await loadMessages(conversationId);
   };
 
   const handleBackToList = () => {
+    setView('list');
+  };
+
+  const handleCloseConversation = () => {
+    closeConversation();
     setView('list');
   };
 
@@ -64,7 +84,7 @@ export const ChatWidget: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-2">
-              {view === 'chat' && conversations.length > 1 && (
+              {view === 'chat' && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -77,19 +97,32 @@ export const ChatWidget: React.FC = () => {
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <h3 className="font-semibold text-sm">
                 {view === 'chat' && activeConversation 
-                  ? `Chat with ${activeConversation.sellerName}`
+                  ? `Chat with ${activeConversation.otherUserName}`
                   : 'Messages'
                 }
               </h3>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleChat}
-              className="h-6 w-6 p-0"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {view === 'chat' && activeConversation && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCloseConversation}
+                  className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                  title="대화 종료"
+                >
+                  <XCircle className="h-3 w-3" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleChat}
+                className="h-6 w-6 p-0"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
 
           {/* Content */}
@@ -110,12 +143,23 @@ export const ChatWidget: React.FC = () => {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {/* Always show previous messages */}
                 {activeConversation.messages.map((message) => (
                   <ChatMessage key={message.id} message={message} />
                 ))}
                 
-                {/* Typing Indicator */}
-                {isTyping && (
+                {/* Show deleted conversation notice if other party deleted */}
+                {activeConversation.otherPartyDeleted && (
+                  <div className="text-center text-muted-foreground py-4">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-red-600 font-medium text-sm">상대방이 채팅을 종료했습니다</p>
+                      <p className="text-red-500 text-xs mt-1">더 이상 메시지를 보낼 수 없습니다</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Typing Indicator - only show if conversation is not deleted by other party */}
+                {!activeConversation.otherPartyDeleted && isTyping && (
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs">
                       🛍️
@@ -133,12 +177,14 @@ export const ChatWidget: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
-              <ChatInput 
-                onSendMessage={sendMessage} 
-                conversationId={activeConversation.id}
-                disabled={isTyping} 
-              />
+              {/* Input - only show if conversation is not deleted by other party */}
+              {!activeConversation.otherPartyDeleted && (
+                <ChatInput 
+                  onSendMessage={sendMessage} 
+                  conversationId={activeConversation.id}
+                  disabled={isTyping} 
+                />
+              )}
             </>
           )}
         </div>

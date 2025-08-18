@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, role: 'buyer' | 'seller', phone: string, phoneVerified: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (updatedUser: User) => void;
   isAuthenticated: boolean;
 }
 
@@ -89,6 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem('auth-user', JSON.stringify(updatedUser));
+  };
+
   const value = {
     user,
     token,
@@ -96,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     signup,
     logout,
+    updateUser,
     isAuthenticated: !!user
   };
 

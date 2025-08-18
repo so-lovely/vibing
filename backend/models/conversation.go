@@ -7,16 +7,18 @@ import (
 )
 
 type Conversation struct {
-	ID          string    `json:"id" gorm:"primaryKey"`
-	BuyerID     string    `json:"buyerId" gorm:"not null"`
-	BuyerName   string    `json:"buyerName"`
-	SellerID    string    `json:"sellerId" gorm:"not null"`
-	SellerName  string    `json:"sellerName"`
-	ProductID   *string   `json:"productId"`
-	ProductName *string   `json:"productName"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
+	ID              string    `json:"id" gorm:"primaryKey"`
+	BuyerID         string    `json:"buyerId" gorm:"not null"`
+	BuyerName       string    `json:"buyerName"`
+	SellerID        string    `json:"sellerId" gorm:"not null"`
+	SellerName      string    `json:"sellerName"`
+	ProductID       *string   `json:"productId"`
+	ProductName     *string   `json:"productName"`
+	BuyerDeleted    bool      `json:"-" gorm:"default:false"`
+	SellerDeleted   bool      `json:"-" gorm:"default:false"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+	DeletedAt       gorm.DeletedAt `json:"-" gorm:"index"`
 
 	// Relations
 	Messages []ChatMessage `json:"messages" gorm:"foreignKey:ConversationID"`
@@ -124,4 +126,50 @@ func (c *Conversation) AddMessage(db *gorm.DB, senderID, senderName, senderRole,
 	db.Model(c).Update("updated_at", time.Now())
 
 	return message, nil
+}
+
+// SoftDeleteForUser marks conversation as deleted for a specific user
+func (c *Conversation) SoftDeleteForUser(db *gorm.DB, userID string) error {
+	updateData := make(map[string]interface{})
+	
+	if c.BuyerID == userID {
+		updateData["buyer_deleted"] = true
+	} else if c.SellerID == userID {
+		updateData["seller_deleted"] = true
+	} else {
+		return nil // User not part of this conversation
+	}
+	
+	return db.Model(c).Where("id = ?", c.ID).Updates(updateData).Error
+}
+
+// IsDeletedForUser checks if conversation is deleted for a specific user
+func (c *Conversation) IsDeletedForUser(userID string) bool {
+	if c.BuyerID == userID {
+		return c.BuyerDeleted
+	} else if c.SellerID == userID {
+		return c.SellerDeleted
+	}
+	return false
+}
+
+// UndeleteForUser marks conversation as not deleted for a specific user and resets both parties' deletion status
+func (c *Conversation) UndeleteForUser(db *gorm.DB, userID string) error {
+	updateData := make(map[string]interface{})
+	
+	if c.BuyerID == userID {
+		updateData["buyer_deleted"] = false
+		updateData["seller_deleted"] = false  // Reset both parties when restarting conversation
+		c.BuyerDeleted = false
+		c.SellerDeleted = false
+	} else if c.SellerID == userID {
+		updateData["seller_deleted"] = false
+		updateData["buyer_deleted"] = false   // Reset both parties when restarting conversation
+		c.SellerDeleted = false
+		c.BuyerDeleted = false
+	} else {
+		return nil // User not part of this conversation
+	}
+	
+	return db.Model(c).Where("id = ?", c.ID).Updates(updateData).Error
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Plus, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -36,6 +37,15 @@ function SellPageContent() {
   const handleViewDashboard = () => {
     setCurrentView('dashboard');
   };
+
+  // Handle URL tab parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'upload') {
+      setCurrentView('upload');
+    }
+  }, [setCurrentView]);
 
   const handleCancelEdit = () => {
     resetForm();

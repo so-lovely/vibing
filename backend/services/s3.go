@@ -22,6 +22,24 @@ type S3Service struct {
 
 // NewS3Service creates new S3 service instance
 func NewS3Service(cfg *config.S3Config) (*S3Service, error) {
+	// Validate configuration
+	if cfg.Region == "" {
+		return nil, fmt.Errorf("AWS region is required")
+	}
+	if cfg.AccessKey == "" {
+		return nil, fmt.Errorf("AWS access key is required")
+	}
+	if cfg.SecretKey == "" {
+		return nil, fmt.Errorf("AWS secret key is required")
+	}
+	if cfg.Bucket == "" {
+		return nil, fmt.Errorf("S3 bucket name is required")
+	}
+
+	// Log configuration (without secrets) for debugging
+	fmt.Printf("S3 Config - Region: %s, Bucket: %s, AccessKey: %s...\n", 
+		cfg.Region, cfg.Bucket, cfg.AccessKey[:10])
+
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(cfg.Region),
 		Credentials: credentials.NewStaticCredentials(
@@ -31,7 +49,7 @@ func NewS3Service(cfg *config.S3Config) (*S3Service, error) {
 		),
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create AWS session: %v", err)
 	}
 
 	return &S3Service{
@@ -47,10 +65,10 @@ func (s *S3Service) UploadProductFile(file *multipart.FileHeader, productID stri
 		return "", 0, fmt.Errorf("only ZIP files are allowed")
 	}
 
-	// Validate file size (max 100MB)
-	const maxSize = 100 * 1024 * 1024 // 100MB
+	// Validate file size (max 200MB)
+	const maxSize = 200 * 1024 * 1024 // 200MB
 	if file.Size > maxSize {
-		return "", 0, fmt.Errorf("file size exceeds 100MB limit")
+		return "", 0, fmt.Errorf("file size exceeds 200MB limit")
 	}
 
 	src, err := file.Open()
@@ -69,13 +87,12 @@ func (s *S3Service) UploadProductFile(file *multipart.FileHeader, productID stri
 	timestamp := time.Now().Unix()
 	filename := fmt.Sprintf("products/%s/%d_%s", productID, timestamp, file.Filename)
 
-	// Upload to S3
+	// Upload to S3 (product files are private, require signed URLs for download)
 	_, err = s.client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(filename),
 		Body:        bytes.NewReader(buf.Bytes()),
 		ContentType: aws.String("application/zip"),
-		ACL:         aws.String("private"), // Private access only
 	})
 
 	if err != nil {
@@ -94,10 +111,10 @@ func (s *S3Service) UploadImage(file *multipart.FileHeader, folder string) (stri
 		return "", fmt.Errorf("only image files (JPG, PNG, GIF, WebP) are allowed")
 	}
 
-	// Validate file size (max 5MB)
-	const maxSize = 5 * 1024 * 1024 // 5MB
+	// Validate file size (max 20MB)
+	const maxSize = 20 * 1024 * 1024 // 20MB
 	if file.Size > maxSize {
-		return "", fmt.Errorf("image size exceeds 5MB limit")
+		return "", fmt.Errorf("image size exceeds 20MB limit")
 	}
 
 	src, err := file.Open()
@@ -120,13 +137,12 @@ func (s *S3Service) UploadImage(file *multipart.FileHeader, folder string) (stri
 	// Determine content type
 	contentType := getImageContentType(ext)
 
-	// Upload to S3
+	// Upload to S3 (public access controlled by bucket policy)
 	_, err = s.client.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(filename),
 		Body:        bytes.NewReader(buf.Bytes()),
 		ContentType: aws.String(contentType),
-		ACL:         aws.String("public-read"), // Public access for images
 	})
 
 	if err != nil {

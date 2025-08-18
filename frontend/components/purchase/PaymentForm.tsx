@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { calculateTotal, formatPrice } from '../../utils/purchaseUtils';
 import type { Product } from '../../types/product';
 
 interface PaymentFormProps {
@@ -27,7 +28,7 @@ export function PaymentForm({
   onPurchase, 
   isProcessing 
 }: PaymentFormProps) {
-  const total = (product.price + 0.99).toFixed(2);
+  const total = calculateTotal(product.price);
 
   return (
     <Card>
@@ -101,7 +102,7 @@ export function PaymentForm({
           onClick={onPurchase}
           disabled={isProcessing}
         >
-          {isProcessing ? 'Processing...' : `Complete Purchase - $${total}`}
+          {isProcessing ? 'Processing...' : `Complete Purchase - ${formatPrice(total)}`}
         </Button>
 
         <p className="text-xs text-muted-foreground text-center">

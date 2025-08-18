@@ -17,6 +17,11 @@ func Setup(app *fiber.App, cfg *config.Config) {
 		log.Printf("Failed to initialize SMS service: %v", err)
 	}
 
+	// Initialize S3 service
+	if err := handlers.InitS3Service(&cfg.S3); err != nil {
+		log.Fatalf("Failed to initialize S3 service: %v", err)
+	}
+
 	// Add security headers
 	app.Use(middleware.SecurityHeaders())
 
@@ -35,6 +40,7 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	authRoutes.Post("/logout", middleware.Auth(), handlers.Logout)
 	authRoutes.Post("/refresh", handlers.RefreshToken)
 	authRoutes.Get("/me", middleware.Auth(), handlers.GetMe)
+	authRoutes.Put("/profile", middleware.Auth(), handlers.UpdateProfile)
 	authRoutes.Post("/send-verification-code", middleware.SMSRateLimit(), middleware.PhoneNumberRateLimit(3, time.Hour), handlers.SendVerificationCode)
 	authRoutes.Post("/verify-phone", handlers.VerifyPhone)
 
@@ -61,8 +67,11 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	// Purchase routes
 	purchaseRoutes := api.Group("/purchase")
 	purchaseRoutes.Use(middleware.Auth())
+	purchaseRoutes.Post("/create", handlers.CreatePurchase)
 	purchaseRoutes.Get("/history", handlers.GetPurchaseHistory)
+	purchaseRoutes.Get("/stats", handlers.GetPurchaseStats)
 	purchaseRoutes.Get("/:id/download", handlers.GetDownloadURL)
+	purchaseRoutes.Get("/check/:productId", handlers.CheckPurchaseStatus)
 	purchaseRoutes.Post("/:id/generate-license", handlers.GenerateLicense)
 
 	// Seller routes
@@ -81,6 +90,7 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	chatRoutes.Get("/conversations/:id/messages", handlers.GetMessages)
 	chatRoutes.Post("/conversations/:id/messages", handlers.SendMessage)
 	chatRoutes.Put("/conversations/:id/read", handlers.MarkAsRead)
+	chatRoutes.Delete("/conversations/:id", handlers.DeleteConversation)
 
 	// Admin routes
 	adminRoutes := api.Group("/admin")
@@ -96,9 +106,9 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	// Upload routes with rate limiting
 	uploadRoutes := api.Group("/upload")
 	uploadRoutes.Use(middleware.Auth(), middleware.UploadRateLimit())
-	uploadRoutes.Post("/image", handlers.UploadImage)
-	uploadRoutes.Post("/product-files", handlers.UploadProductFiles)
-	uploadRoutes.Get("/signed-url", handlers.GetSignedURL)
+	uploadRoutes.Post("/image", middleware.SellerOnly(), handlers.UploadImage)
+	uploadRoutes.Post("/product-files", middleware.SellerOnly(), handlers.UploadProductFiles)
+	uploadRoutes.Get("/signed-url", middleware.SellerOnly(), handlers.GetSignedURL)
 
 	// Security routes
 	securityRoutes := api.Group("/security")

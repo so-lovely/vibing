@@ -24,17 +24,17 @@ type Product struct {
 	Featured      bool           `json:"featured" gorm:"default:false"`
 	Tags          []string `json:"tags" gorm:"type:text[]"`
 	Status        string         `json:"status" gorm:"type:varchar(20);default:'pending';check:status IN ('active','pending','rejected','deleted')" validate:"oneof=active pending rejected deleted"`
-	FileURLs      []string `json:"fileUrls" gorm:"type:text[]"`
-	FileSizes     []int64  `json:"fileSizes" gorm:"type:bigint[]"`
+	FileURL       string `json:"fileUrl"`
+	FileSize      string `json:"fileSize"`
 	LicenseType   string         `json:"licenseType" validate:"omitempty,oneof=MIT Apache GPL BSD Custom Commercial"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
 
 	// Relations
-	AuthorUser User       `json:"authorUser,omitempty" gorm:"foreignKey:AuthorID"`
-	Purchases  []Purchase `json:"purchases,omitempty" gorm:"foreignKey:ProductID"`
-	Reviews    []Review   `json:"reviews,omitempty" gorm:"foreignKey:ProductID"`
+	AuthorUser User       `json:"authorUser,omitempty" gorm:"foreignKey:AuthorID" validate:"-"`
+	Purchases  []Purchase `json:"purchases,omitempty" gorm:"foreignKey:ProductID" validate:"-"`
+	Reviews    []Review   `json:"reviews,omitempty" gorm:"foreignKey:ProductID" validate:"-"`
 }
 
 // BeforeCreate hook to generate UUID

@@ -58,7 +58,7 @@ export function SellerDashboard({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${(stats?.totalRevenue || 0).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">+12% from last month</p>
           </CardContent>
         </Card>
@@ -69,7 +69,7 @@ export function SellerDashboard({
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSales}</div>
+            <div className="text-2xl font-bold">{stats?.totalSales || 0}</div>
             <p className="text-xs text-muted-foreground">+8% from last month</p>
           </CardContent>
         </Card>
@@ -80,7 +80,7 @@ export function SellerDashboard({
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+            <div className="text-2xl font-bold">{stats?.totalProducts || 0}</div>
             <p className="text-xs text-muted-foreground">Active products</p>
           </CardContent>
         </Card>
@@ -91,7 +91,7 @@ export function SellerDashboard({
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</div>
+            <div className="text-2xl font-bold">{(stats?.avgRating || 0).toFixed(1)}</div>
             <p className="text-xs text-muted-foreground">Out of 5.0</p>
           </CardContent>
         </Card>
@@ -121,13 +121,13 @@ export function SellerDashboard({
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.title}</TableCell>
                   <TableCell>{product.category}</TableCell>
-                  <TableCell>${product.price}</TableCell>
-                  <TableCell>{product.sales}</TableCell>
-                  <TableCell>${product.revenue.toFixed(2)}</TableCell>
+                  <TableCell>${product.price || 0}</TableCell>
+                  <TableCell>{product.sales || 0}</TableCell>
+                  <TableCell>${(product.revenue || 0).toFixed(2)}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
                       <Eye className="w-4 h-4" />
-                      <span>{product.views}</span>
+                      <span>{product.views || 0}</span>
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(product.status)}</TableCell>
@@ -137,6 +137,8 @@ export function SellerDashboard({
                         variant="ghost"
                         size="icon"
                         onClick={() => onEditProduct(product.id)}
+                        className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                        title="제품 수정"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -144,6 +146,8 @@ export function SellerDashboard({
                         variant="ghost"
                         size="icon"
                         onClick={() => onDeleteProduct(product.id)}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        title="제품 삭제"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

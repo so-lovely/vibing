@@ -205,6 +205,52 @@ func Logout(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateProfile updates user profile information
+func UpdateProfile(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	
+	var updateData struct {
+		Name string `json:"name" validate:"required,min=2,max=100"`
+	}
+	
+	if err := c.BodyParser(&updateData); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid request body",
+			},
+		})
+	}
+	
+	// Validate update data
+	if validationErrors := utils.ValidateStruct(updateData); len(validationErrors) > 0 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Validation failed",
+				"details": validationErrors,
+			},
+		})
+	}
+	
+	// Update user name
+	user.Name = updateData.Name
+	
+	if err := database.DB.Save(&user).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to update profile",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"user": user.Public(),
+		"message": "Profile updated successfully",
+	})
+}
+
 // RefreshToken generates new access token
 func RefreshToken(c *fiber.Ctx) error {
 	var req RefreshRequest

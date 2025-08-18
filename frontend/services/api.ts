@@ -10,13 +10,20 @@ class ApiError extends Error {
 export const apiClient = {
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('auth-token');
+    console.log('API Request:', { endpoint, hasToken: !!token, token: token?.substring(0, 20) + '...' });
+    
+    const headers: Record<string, string> = {
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(options.headers as Record<string, string>),
+    };
+
+    // Don't set Content-Type for FormData, let browser handle it
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
+      headers,
       ...options,
     };
 

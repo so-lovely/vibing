@@ -31,13 +31,13 @@ func GetConversations(c *fiber.Ctx) error {
 	var conversations []models.Conversation
 	var total int64
 
-	// Count total conversations where user is either buyer or seller
+	// Count total conversations where user is either buyer or seller (excluding deleted ones)
 	database.DB.Model(&models.Conversation{}).
-		Where("buyer_id = ? OR seller_id = ?", user.ID, user.ID).
+		Where("(buyer_id = ? AND buyer_deleted = false) OR (seller_id = ? AND seller_deleted = false)", user.ID, user.ID).
 		Count(&total)
 
-	// Get conversations with recent messages
-	database.DB.Where("buyer_id = ? OR seller_id = ?", user.ID, user.ID).
+	// Get conversations with recent messages (excluding deleted ones)
+	database.DB.Where("(buyer_id = ? AND buyer_deleted = false) OR (seller_id = ? AND seller_deleted = false)", user.ID, user.ID).
 		Preload("Messages", func(db *gorm.DB) *gorm.DB {
 			return db.Order("created_at DESC").Limit(1)
 		}).
@@ -53,14 +53,23 @@ func GetConversations(c *fiber.Ctx) error {
 		unreadCount := conv.GetUnreadCount(user.ID)
 		lastMessage := conv.GetLastMessage()
 
+		// Check if the other party has deleted this conversation
+		otherPartyDeleted := false
+		if user.ID == conv.BuyerID {
+			otherPartyDeleted = conv.SellerDeleted
+		} else {
+			otherPartyDeleted = conv.BuyerDeleted
+		}
+
 		convData := fiber.Map{
-			"id":           conv.ID,
-			"otherUserId":  otherUserID,
-			"otherUserName": otherUserName,
-			"productId":    conv.ProductID,
-			"productName":  conv.ProductName,
-			"unreadCount":  unreadCount,
-			"updatedAt":    conv.UpdatedAt,
+			"id":                conv.ID,
+			"otherUserId":       otherUserID,
+			"otherUserName":     otherUserName,
+			"productId":         conv.ProductID,
+			"productName":       conv.ProductName,
+			"unreadCount":       unreadCount,
+			"updatedAt":         conv.UpdatedAt,
+			"otherPartyDeleted": otherPartyDeleted,
 		}
 
 		if lastMessage != nil {
@@ -99,7 +108,7 @@ func CreateConversation(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if conversation already exists
+	// Check if conversation already exists (and is not deleted for this user)
 	var existingConv models.Conversation
 	query := database.DB.Where("(buyer_id = ? AND seller_id = ?) OR (buyer_id = ? AND seller_id = ?)",
 		user.ID, req.SellerID, req.SellerID, user.ID)
@@ -109,15 +118,32 @@ func CreateConversation(c *fiber.Ctx) error {
 	}
 
 	if err := query.First(&existingConv).Error; err == nil {
-		return c.JSON(fiber.Map{
-			"conversation": fiber.Map{
-				"id":          existingConv.ID,
-				"buyerId":     existingConv.BuyerID,
-				"sellerId":    existingConv.SellerID,
-				"productId":   existingConv.ProductID,
-				"productName": existingConv.ProductName,
-			},
-		})
+		// Check if conversation is deleted for this user
+		if !existingConv.IsDeletedForUser(user.ID) {
+			// Conversation exists and is not deleted - return it
+			return c.JSON(fiber.Map{
+				"conversation": fiber.Map{
+					"id":          existingConv.ID,
+					"buyerId":     existingConv.BuyerID,
+					"sellerId":    existingConv.SellerID,
+					"productId":   existingConv.ProductID,
+					"productName": existingConv.ProductName,
+				},
+			})
+		}
+		// If conversation is deleted for this user, undelete it and return
+		if err := existingConv.UndeleteForUser(database.DB, user.ID); err == nil {
+			return c.JSON(fiber.Map{
+				"conversation": fiber.Map{
+					"id":          existingConv.ID,
+					"buyerId":     existingConv.BuyerID,
+					"sellerId":    existingConv.SellerID,
+					"productId":   existingConv.ProductID,
+					"productName": existingConv.ProductName,
+				},
+			})
+		}
+		// If undelete fails, continue to create new conversation
 	}
 
 	// Create new conversation
@@ -187,7 +213,7 @@ func GetMessages(c *fiber.Ctx) error {
 		Count(&total)
 
 	database.DB.Where("conversation_id = ?", conversationID).
-		Order("created_at DESC").
+		Order("created_at ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&messages)
@@ -234,6 +260,23 @@ func SendMessage(c *fiber.Ctx) error {
 			"error": fiber.Map{
 				"code":    "FORBIDDEN",
 				"message": "Access denied",
+			},
+		})
+	}
+
+	// Check if the other party has deleted this conversation
+	otherPartyDeleted := false
+	if user.ID == conversation.BuyerID {
+		otherPartyDeleted = conversation.SellerDeleted
+	} else {
+		otherPartyDeleted = conversation.BuyerDeleted
+	}
+
+	if otherPartyDeleted {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "CONVERSATION_DELETED",
+				"message": "The other party has left this conversation",
 			},
 		})
 	}
@@ -295,5 +338,44 @@ func MarkAsRead(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Marked as read",
+	})
+}
+
+// DeleteConversation deletes a conversation for the current user
+func DeleteConversation(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	conversationID := c.Params("id")
+
+	var conversation models.Conversation
+	if err := database.DB.Where("id = ?", conversationID).First(&conversation).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Conversation not found",
+			},
+		})
+	}
+
+	if !conversation.CanUserAccess(user.ID) {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "Access denied",
+			},
+		})
+	}
+
+	// Soft delete - set deleted flag for this user only
+	if err := conversation.SoftDeleteForUser(database.DB, user.ID); err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to delete conversation",
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Conversation deleted",
 	})
 }

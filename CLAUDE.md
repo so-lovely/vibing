@@ -1,2 +1,3 @@
 - Don't make long files.Divide by each directory
 - Use already configured backend api
+- 이미 있는 백엔드 api와 프론트엔드 구조를 고려하세요

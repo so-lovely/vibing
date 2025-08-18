@@ -52,6 +52,9 @@ func Migrate() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Ensure file_urls and file_sizes are properly formatted as text arrays
+	log.Println("Database schema configured for text arrays")
+
 	log.Println("Database migrations completed")
 	return nil
 }

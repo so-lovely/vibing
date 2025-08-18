@@ -13,6 +13,11 @@ services:
       - DB_PASSWORD=password
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=your-super-secret-jwt-key-here
+      # S3 Configuration
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=AKIA3MVITXC2Y3DDZ4EJ
+      - AWS_SECRET_ACCESS_KEY=CEb7gz/KbYELtF4nbxzekFh4clSYaYaHZ/OjFdjK
+      - S3_BUCKET=vibing-uploads-test
     depends_on:
       postgres:
         condition: service_healthy

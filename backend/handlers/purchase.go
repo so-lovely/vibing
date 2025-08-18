@@ -117,13 +117,17 @@ func GetDownloadURL(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Generate secure download URL (expires in 1 hour)
-	downloadURL := purchase.GenerateDownloadURL()
+	// Use the actual file URL from the product as download URL
+	downloadURL := purchase.Product.FileURL
+	if downloadURL == "" {
+		downloadURL = "https://download.vibing.com/secure/" + purchaseID
+	}
 	expiresAt := time.Now().Add(1 * time.Hour)
 	
 	return c.JSON(fiber.Map{
 		"downloadUrl": downloadURL,
 		"expiresAt":   expiresAt,
+		"fileSize":    purchase.Product.FileSize,
 	})
 }
 
@@ -199,6 +203,58 @@ func GetPurchaseStats(c *fiber.Ctx) error {
 			"completedPurchases": completedPurchases,
 			"totalSpent":        totalSpent,
 		},
+	})
+}
+
+// CreatePurchase creates a new purchase for testing
+func CreatePurchase(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	
+	var req struct {
+		ProductID string `json:"productId" validate:"required"`
+	}
+	
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INVALID_REQUEST",
+				"message": "Invalid request body",
+			},
+		})
+	}
+	
+	// Find the product
+	var product models.Product
+	if err := database.DB.First(&product, "id = ?", req.ProductID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Product not found",
+			},
+		})
+	}
+	
+	// Create purchase
+	purchase := models.Purchase{
+		UserID:    user.ID,
+		ProductID: req.ProductID,
+		Price:     product.Price,
+		Status:    "completed", // Auto-complete for testing
+		PaymentMethod: "test",
+	}
+	
+	if err := database.DB.Create(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to create purchase",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"purchase": purchase,
+		"message":  "Purchase created successfully",
 	})
 }
 

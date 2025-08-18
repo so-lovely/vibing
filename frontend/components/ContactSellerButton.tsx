@@ -30,14 +30,14 @@ export const ContactSellerButton: React.FC<ContactSellerButtonProps> = ({
   const { user } = useAuth();
   const { startConversation, toggleChat } = useChat();
 
-  const handleContactSeller = () => {
+  const handleContactSeller = async () => {
     if (!user || !sellerId) return;
     
     // Don't allow sellers to contact themselves
     if (user.id === sellerId) return;
     
     // Start a conversation with the seller
-    startConversation(sellerId, sellerName, productId, productName);
+    await startConversation(sellerId, sellerName, productId, productName);
     toggleChat(); // Open the chat widget
   };
 

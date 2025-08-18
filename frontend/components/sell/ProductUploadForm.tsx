@@ -16,9 +16,9 @@ interface ProductUploadFormProps {
     category: string;
     tags: string[];
     imageFile: File | null;
-    productFiles: File[];
+    productFile: File | null;
   };
-  onInputChange: (field: string, value: string | File | File[] | string[]) => void;
+  onInputChange: (field: string, value: string | File | null | string[]) => void;
   onSubmit: () => void;
   isUploading: boolean;
 }
@@ -44,8 +44,8 @@ export function ProductUploadForm({
     
     if (field === 'imageFile') {
       onInputChange(field, files[0]);
-    } else if (field === 'productFiles') {
-      onInputChange(field, Array.from(files));
+    } else if (field === 'productFile') {
+      onInputChange(field, files[0]);
     }
   };
 
@@ -151,26 +151,24 @@ export function ProductUploadForm({
             </div>
 
             <div>
-              <Label htmlFor="files">Product Files *</Label>
+              <Label htmlFor="files">Product ZIP File *</Label>
               <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
                 <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <Input
                   id="files"
                   type="file"
-                  multiple
-                  onChange={(e) => handleFileUpload('productFiles', e.target.files)}
+                  accept=".zip"
+                  onChange={(e) => handleFileUpload('productFile', e.target.files)}
                   className="hidden"
                 />
                 <Label htmlFor="files" className="cursor-pointer">
                   <Button variant="outline" asChild>
-                    <span>Choose Files</span>
+                    <span>Choose ZIP File</span>
                   </Button>
                 </Label>
-                {formData.productFiles.length > 0 && (
+                {formData.productFile && (
                   <div className="text-sm text-muted-foreground mt-2">
-                    {formData.productFiles.map(file => (
-                      <p key={file.name}>{file.name}</p>
-                    ))}
+                    <p>{formData.productFile.name}</p>
                   </div>
                 )}
               </div>

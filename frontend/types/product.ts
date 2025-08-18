@@ -3,24 +3,31 @@ export interface Product {
   title: string;
   description: string;
   price: number;
-  imageUrl: string;
-  author: string;
-  category: string;
-  tags: string[];
-  downloadUrl?: string;
-  demoUrl?: string;
-  githubUrl?: string;
-  documentation?: string;
-  version: string;
-  fileSize?: string;
-  downloads: number;
+  originalPrice?: number;
   rating: number;
-  reviews: number;
-  isPremium: boolean;
-  isActive: boolean;
-  sellerId: string;
+  reviewCount: number;
+  downloads: number;
+  views: number;
+  category: string;
+  author: string;
+  authorId: string;
+  imageUrl?: string;
+  isPro: boolean;
+  featured: boolean;
+  tags: string[];
+  status: string;
+  fileUrls: string[];
+  fileSizes: number[];
+  licenseType?: string;
   createdAt: string;
   updatedAt: string;
+  
+  // Keep these for compatibility
+  isPremium?: boolean;
+  isActive?: boolean;
+  sellerId?: string;
+  version?: string;
+  reviews?: number;
 }
 
 export interface Category {

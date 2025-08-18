@@ -5,12 +5,23 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"vibing-backend/config"
 	"vibing-backend/database"
 	"vibing-backend/models"
 	"vibing-backend/services"
 )
 
 var s3Service *services.S3Service
+
+// InitS3Service initializes the S3 service
+func InitS3Service(cfg *config.S3Config) error {
+	service, err := services.NewS3Service(cfg)
+	if err != nil {
+		return err
+	}
+	s3Service = service
+	return nil
+}
 
 // UploadImage uploads product image
 func UploadImage(c *fiber.Ctx) error {
@@ -77,62 +88,48 @@ func UploadProductFiles(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get files from form (support multiple files)
-	form, err := c.MultipartForm()
+	// Get single file from form
+	file, err := c.FormFile("file")
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "VALIDATION_ERROR",
-				"message": "Invalid form data",
+				"message": "No file provided",
 			},
 		})
 	}
 
-	files := form.File["files"]
-	if len(files) == 0 {
+	// Upload file to S3 (only ZIP files allowed)
+	fileURL, fileSize, err := s3Service.UploadProductFile(file, productID)
+	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": fiber.Map{
-				"code":    "VALIDATION_ERROR",
-				"message": "No files provided",
+				"code":    "UPLOAD_ERROR",
+				"message": err.Error(),
 			},
 		})
 	}
 
-	// Upload each file (only ZIP files allowed)
-	var uploadedFiles []fiber.Map
-	var fileURLs []string
-	var fileSizes []int64
+	// Update product with file URL and size
+	product.FileURL = fileURL
+	product.FileSize = fmt.Sprintf("%d", fileSize)
+	
+	if err := database.DB.Save(&product).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "DATABASE_ERROR",
+				"message": "Failed to update product with file information",
+			},
+		})
+	}
 
-	for _, file := range files {
-		// Upload to S3
-		fileURL, fileSize, err := s3Service.UploadProductFile(file, productID)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{
-				"error": fiber.Map{
-					"code":    "UPLOAD_ERROR",
-					"message": err.Error(),
-				},
-			})
-		}
-
-		uploadedFiles = append(uploadedFiles, fiber.Map{
+	return c.JSON(fiber.Map{
+		"file": fiber.Map{
 			"filename": file.Filename,
 			"url":      fileURL,
 			"size":     fileSize,
-		})
-
-		fileURLs = append(fileURLs, fileURL)
-		fileSizes = append(fileSizes, fileSize)
-	}
-
-	// Update product with file URLs and sizes
-	product.FileURLs = fileURLs
-	product.FileSizes = fileSizes
-	database.DB.Save(&product)
-
-	return c.JSON(fiber.Map{
-		"files":   uploadedFiles,
-		"message": "Files uploaded successfully",
+		},
+		"message": "File uploaded successfully",
 	})
 }
 

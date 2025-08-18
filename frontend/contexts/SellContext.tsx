@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { productApi } from '../services/productApi';
+import { uploadApi } from '../services/uploadApi';
+import { useAuth } from './AuthContext';
 import type { Product } from '../types/product';
 
 interface ProductFormData {
@@ -9,7 +11,7 @@ interface ProductFormData {
   category: string;
   tags: string[];
   imageFile: File | null;
-  productFiles: File[];
+  productFile: File | null;
 }
 
 
@@ -44,6 +46,7 @@ const SellContext = createContext<SellContextType | undefined>(undefined);
 
 
 export function SellProvider({ children }: { children: ReactNode }) {
+  const { user, token } = useAuth();
   const [currentView, setCurrentView] = useState<'dashboard' | 'upload' | 'success' | 'edit'>('dashboard');
   const [formData, setFormData] = useState<ProductFormData>({
     title: '',
@@ -52,7 +55,7 @@ export function SellProvider({ children }: { children: ReactNode }) {
     category: '',
     tags: [],
     imageFile: null,
-    productFiles: [],
+    productFile: null,
   });
   
   const [isUploading, setIsUploading] = useState(false);
@@ -101,36 +104,78 @@ export function SellProvider({ children }: { children: ReactNode }) {
   };
 
   const uploadProduct = async () => {
+    // Validation checks
+    if (!user || !token) {
+      console.error('User not authenticated');
+      alert('Please log in to upload products');
+      return;
+    }
+    
+    if (user.role !== 'seller' && user.role !== 'admin') {
+      console.error('User does not have seller permissions');
+      alert('Only sellers can upload products');
+      return;
+    }
+
+    if (!formData.title.trim() || !formData.description.trim() || !formData.category || !formData.price) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.description.trim().length < 10) {
+      alert('Description must be at least 10 characters');
+      return;
+    }
+
+    if (parseFloat(formData.price) < 0) {
+      alert('Price must be 0 or greater');
+      return;
+    }
+
+    console.log('Starting upload with user:', { id: user.id, role: user.role, hasToken: !!token });
     setIsUploading(true);
     
     try {
+      // First upload image if provided
+      let imageUrl = '';
+      if (formData.imageFile) {
+        console.log('Uploading image...');
+        const imageResponse = await uploadApi.uploadImage(formData.imageFile);
+        imageUrl = imageResponse.imageUrl;
+        console.log('Image uploaded:', imageUrl);
+      }
+
+      // Create product with image URL
       const productData = {
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         category: formData.category,
         price: parseFloat(formData.price),
         tags: formData.tags,
-        imageUrl: '',
-        author: '',
-        version: '1.0.0',
-        downloads: 0,
-        rating: 0,
-        reviews: 0,
-        isPremium: false,
-        isActive: true,
-        sellerId: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        imageUrl: imageUrl || ''
       };
       
+      console.log('Creating product with data:', productData);
       const newProduct = await productApi.createProduct(productData);
-      setProducts(prev => [newProduct, ...prev]);
-      setStats(prev => ({ ...prev, totalProducts: prev.totalProducts + 1 }));
+      console.log('Product created:', newProduct);
+
+      // Upload product file if provided
+      if (formData.productFile) {
+        console.log('Uploading product file...');
+        const fileResponse = await uploadApi.uploadProductFile(newProduct.id, formData.productFile);
+        console.log('File uploaded:', fileResponse);
+      }
+
+      // Reload products to get the latest data
+      await loadSellerData();
       
       setIsUploaded(true);
       setCurrentView('success');
-    } catch (error) {
+      resetForm();
+    } catch (error: any) {
       console.error('Failed to upload product:', error);
+      const errorMessage = error?.message || 'Failed to upload product. Please try again.';
+      alert(`Upload failed: ${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
@@ -144,36 +189,80 @@ export function SellProvider({ children }: { children: ReactNode }) {
       category: '',
       tags: [],
       imageFile: null,
-      productFiles: [],
+      productFile: null,
     });
     setIsUploaded(false);
   };
 
   const updateProduct = async () => {
-    if (!editingProductId) return;
+    if (!editingProductId || !user || !token) return;
+    
+    // Validation checks
+    if (!formData.title.trim() || !formData.description.trim() || !formData.category || !formData.price) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.description.trim().length < 10) {
+      alert('Description must be at least 10 characters');
+      return;
+    }
+
+    if (parseFloat(formData.price) < 0) {
+      alert('Price must be 0 or greater');
+      return;
+    }
     
     setIsEditing(true);
     
     try {
+      // First upload image if a new one is provided
+      let imageUrl = '';
+      if (formData.imageFile) {
+        console.log('Uploading new image...');
+        const imageResponse = await uploadApi.uploadImage(formData.imageFile);
+        imageUrl = imageResponse.imageUrl;
+        console.log('Image uploaded:', imageUrl);
+      }
+
+      // Prepare update data
       const updateData = {
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         category: formData.category,
         price: parseFloat(formData.price),
-        tags: formData.tags
+        tags: formData.tags,
+        imageUrl: imageUrl // Only include if new image was uploaded
       };
       
+      console.log('Updating product with data:', updateData);
       const updatedProduct = await productApi.updateProduct(editingProductId, updateData);
+      console.log('Product updated:', updatedProduct);
+
+      // Upload product file if a new one is provided
+      if (formData.productFile) {
+        console.log('Uploading new product file...');
+        const fileResponse = await uploadApi.uploadProductFile(editingProductId, formData.productFile);
+        console.log('File uploaded:', fileResponse);
+      }
       
+      // Update local state
       setProducts(prev => prev.map(product => 
         product.id === editingProductId ? updatedProduct : product
       ));
       
+      // Update stats
+      await loadSellerData();
+      
       setEditingProductId(null);
       setCurrentView('dashboard');
       resetForm();
-    } catch (error) {
+      
+      alert('제품이 성공적으로 수정되었습니다.');
+    } catch (error: any) {
       console.error('Failed to update product:', error);
+      const errorMessage = error?.message || '제품 수정에 실패했습니다.';
+      alert(`수정 실패: ${errorMessage}`);
     } finally {
       setIsEditing(false);
     }
@@ -189,7 +278,7 @@ export function SellProvider({ children }: { children: ReactNode }) {
         category: product.category,
         tags: product.tags || [],
         imageFile: null,
-        productFiles: [],
+        productFile: null,
       });
       setEditingProductId(id);
       setCurrentView('edit');
@@ -201,12 +290,30 @@ export function SellProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteProduct = async (id: string) => {
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+
+    const confirmDelete = window.confirm(
+      `정말로 "${product.title}" 제품을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+    );
+    
+    if (!confirmDelete) return;
+
     try {
       await productApi.deleteProduct(id);
       setProducts(prev => prev.filter(p => p.id !== id));
-      setStats(prev => ({ ...prev, totalProducts: prev.totalProducts - 1 }));
-    } catch (error) {
+      setStats(prev => ({ 
+        ...prev, 
+        totalProducts: prev.totalProducts - 1,
+        totalRevenue: prev.totalRevenue - (product.price * product.downloads),
+        totalSales: prev.totalSales - product.downloads
+      }));
+      
+      alert('제품이 성공적으로 삭제되었습니다.');
+    } catch (error: any) {
       console.error('Failed to delete product:', error);
+      const errorMessage = error?.message || '제품 삭제에 실패했습니다.';
+      alert(`삭제 실패: ${errorMessage}`);
     }
   };
 

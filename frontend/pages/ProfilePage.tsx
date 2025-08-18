@@ -7,13 +7,14 @@ import { Label } from '../components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { User, Mail, Shield, Edit, Save, X } from 'lucide-react';
+import { apiClient } from '../services/api';
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [editedUser, setEditedUser] = useState({
     name: user?.name || '',
-    email: user?.email || '',
   });
 
   if (!user) return null;
@@ -38,16 +39,37 @@ export function ProfilePage() {
     }
   };
 
-  const handleSave = () => {
-    // In a real app, this would call an API to update user info
-    console.log('Saving user data:', editedUser);
-    setIsEditing(false);
+  const handleSave = async () => {
+    if (!editedUser.name.trim()) {
+      alert('이름을 입력해주세요.');
+      return;
+    }
+    
+    setIsUpdating(true);
+    try {
+      const response = await apiClient.put('/auth/profile', {
+        name: editedUser.name.trim(),
+      });
+      
+      // Update user data in context
+      if (updateUser) {
+        updateUser(response.user);
+      }
+      
+      setIsEditing(false);
+      alert('프로필이 성공적으로 수정되었습니다.');
+    } catch (error: any) {
+      console.error('Failed to update profile:', error);
+      const errorMessage = error?.message || '프로필 수정에 실패했습니다.';
+      alert(`수정 실패: ${errorMessage}`);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleCancel = () => {
     setEditedUser({
       name: user.name,
-      email: user.email,
     });
     setIsEditing(false);
   };
@@ -113,6 +135,7 @@ export function ProfilePage() {
                     variant="outline" 
                     size="sm"
                     onClick={handleCancel}
+                    disabled={isUpdating}
                   >
                     <X className="h-4 w-4 mr-2" />
                     취소
@@ -120,9 +143,10 @@ export function ProfilePage() {
                   <Button 
                     size="sm"
                     onClick={handleSave}
+                    disabled={isUpdating}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    저장
+                    {isUpdating ? '저장 중...' : '저장'}
                   </Button>
                 </div>
               )}
@@ -136,6 +160,7 @@ export function ProfilePage() {
                       id="name"
                       value={editedUser.name}
                       onChange={(e) => setEditedUser({ ...editedUser, name: e.target.value })}
+                      disabled={isUpdating}
                     />
                   ) : (
                     <div className="p-2 bg-muted rounded-md">{user.name}</div>
@@ -144,16 +169,8 @@ export function ProfilePage() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="email">이메일</Label>
-                  {isEditing ? (
-                    <Input
-                      id="email"
-                      type="email"
-                      value={editedUser.email}
-                      onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
-                    />
-                  ) : (
-                    <div className="p-2 bg-muted rounded-md">{user.email}</div>
-                  )}
+                  <div className="p-2 bg-muted rounded-md text-muted-foreground">{user.email}</div>
+                  <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -175,50 +192,6 @@ export function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Account Statistics (for sellers and admins) */}
-          {(user.role === 'seller' || user.role === 'admin') && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>계정 통계</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {user.role === 'seller' && (
-                    <>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">0</div>
-                        <div className="text-sm text-muted-foreground">등록된 상품</div>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">0</div>
-                        <div className="text-sm text-muted-foreground">총 판매량</div>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">₩0</div>
-                        <div className="text-sm text-muted-foreground">총 수익</div>
-                      </div>
-                    </>
-                  )}
-                  {user.role === 'admin' && (
-                    <>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">12</div>
-                        <div className="text-sm text-muted-foreground">총 사용자</div>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">12</div>
-                        <div className="text-sm text-muted-foreground">총 상품</div>
-                      </div>
-                      <div className="text-center p-4 bg-muted rounded-md">
-                        <div className="text-2xl font-bold">0</div>
-                        <div className="text-sm text-muted-foreground">보류중인 승인</div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </div>

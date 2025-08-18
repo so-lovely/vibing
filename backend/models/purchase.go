@@ -74,8 +74,12 @@ func (p *Purchase) IncrementDownload(db *gorm.DB) error {
 
 // GenerateDownloadURL creates a secure download URL
 func (p *Purchase) GenerateDownloadURL() string {
-	// This would integrate with S3 or similar service
-	// For now, return a placeholder
+	// Return the actual file URL from the product
+	// In production, this could be a pre-signed S3 URL for security
+	if p.Product.FileURL != "" {
+		return p.Product.FileURL
+	}
+	// Fallback placeholder if no file URL
 	return "https://download.vibing.com/secure/" + p.ID
 }
 

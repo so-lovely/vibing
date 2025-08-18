@@ -30,7 +30,7 @@ export function ProductDetailsCard({ product }: ProductDetailsCardProps) {
         <div>
           <h4 className="font-medium mb-2">태그</h4>
           <div className="flex flex-wrap gap-2">
-            {product.tags.map((tag, index) => (
+            {(product.tags || []).map((tag, index) => (
               <Badge key={index} variant="outline" className="flex items-center gap-1">
                 <Tag className="w-3 h-3" />
                 {tag}
@@ -56,22 +56,18 @@ export function ProductDetailsCard({ product }: ProductDetailsCardProps) {
               <Clock className="w-4 h-4" />
               생성일
             </h4>
-            <p className="text-muted-foreground">{formatDate(product.createdAt)}</p>
+            <p className="text-muted-foreground">{product.createdAt ? formatDate(product.createdAt) : 'N/A'}</p>
           </div>
         </div>
         
         <Separator />
         
-        {/* Features */}
+        {/* Product Description */}
         <div className="space-y-3">
-          <h4 className="font-medium">상품 특징</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>• 즉시 다운로드 가능</li>
-            <li>• 소스 코드 포함</li>
-            <li>• 문서화 완료</li>
-            <li>• 커뮤니티 지원</li>
-            {product.isPro && <li>• 프리미엄 지원 포함</li>}
-          </ul>
+          <h4 className="font-medium">상품 설명</h4>
+          <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {product.description || '상품 설명이 없습니다.'}
+          </div>
         </div>
       </CardContent>
     </Card>

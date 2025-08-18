@@ -47,9 +47,11 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h4 className="font-medium text-sm truncate">
-                    {conversation.sellerName}
+                    {conversation.otherUserName}
                   </h4>
-                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    conversation.otherPartyDeleted ? 'bg-red-500' : 'bg-green-500'
+                  }`}></div>
                 </div>
                 
                 {conversation.productName && (
@@ -58,17 +60,21 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   </p>
                 )}
                 
-                {conversation.lastMessage && (
+                {conversation.otherPartyDeleted ? (
+                  <p className="text-xs text-red-500 mt-1 truncate">
+                    삭제된 채팅
+                  </p>
+                ) : conversation.lastMessage ? (
                   <p className="text-xs text-muted-foreground mt-1 truncate">
                     {conversation.lastMessage.text}
                   </p>
-                )}
+                ) : null}
               </div>
               
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 {conversation.lastMessage && (
                   <span className="text-xs text-muted-foreground">
-                    {conversation.lastMessage.timestamp.toLocaleTimeString([], { 
+                    {new Date(conversation.lastMessage.timestamp).toLocaleTimeString([], { 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}

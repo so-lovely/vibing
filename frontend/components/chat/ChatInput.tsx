@@ -1,4 +1,4 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState, KeyboardEvent, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -15,21 +15,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   disabled = false 
 }) => {
   const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = useCallback(async () => {
     const trimmedMessage = message.trim();
-    if (trimmedMessage && !disabled) {
-      onSendMessage(trimmedMessage, conversationId);
-      setMessage('');
+    if (trimmedMessage && !disabled && !isSending) {
+      setIsSending(true);
+      try {
+        await onSendMessage(trimmedMessage, conversationId);
+        setMessage('');
+      } finally {
+        setIsSending(false);
+      }
     }
-  };
+  }, [message, disabled, isSending, onSendMessage, conversationId]);
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
 
   return (
     <div className="flex gap-2 p-3 border-t">

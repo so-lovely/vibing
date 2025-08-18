@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -62,9 +63,7 @@ func GetProduct(c *fiber.Ctx) error {
 	// Increment view count
 	database.DB.Model(&product).UpdateColumn("views", product.Views+1)
 	
-	return c.JSON(fiber.Map{
-		"product": product,
-	})
+	return c.JSON(product)
 }
 
 // CreateProduct creates a new product (seller only)
@@ -86,8 +85,14 @@ func CreateProduct(c *fiber.Ctx) error {
 	product.Author = user.Name
 	product.Status = "active" // Change from "pending" to "active" for immediate visibility
 	
+	// Debug: log what we're about to validate
+	fmt.Printf("About to validate product: %+v\n", product)
+	fmt.Printf("Product type: %T\n", product)
+	
 	// Validate product data
 	if validationErrors := utils.ValidateStruct(product); len(validationErrors) > 0 {
+		// Log validation errors for debugging
+		fmt.Printf("Product validation failed: %+v\n", validationErrors)
 		return c.Status(400).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "VALIDATION_ERROR",
@@ -107,21 +112,123 @@ func CreateProduct(c *fiber.Ctx) error {
 		})
 	}
 	
-	return c.Status(201).JSON(fiber.Map{
-		"product": product,
-	})
+	return c.Status(201).JSON(product)
 }
 
 // UpdateProduct updates existing product
 func UpdateProduct(c *fiber.Ctx) error {
-	// Implementation placeholder
-	return c.JSON(fiber.Map{"message": "Not implemented"})
+	user := c.Locals("user").(*models.User)
+	id := c.Params("id")
+	
+	var product models.Product
+	if err := database.DB.Where("id = ?", id).First(&product).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Product not found",
+			},
+		})
+	}
+	
+	// Check if user owns the product or is admin
+	if product.AuthorID != user.ID && user.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "You can only update your own products",
+			},
+		})
+	}
+	
+	var updateData struct {
+		Title       string   `json:"title" validate:"required,min=1,max=200"`
+		Description string   `json:"description" validate:"required,min=10,max=2000"`
+		Category    string   `json:"category" validate:"required"`
+		Price       float64  `json:"price" validate:"gte=0"`
+		Tags        []string `json:"tags"`
+		ImageUrl    string   `json:"imageUrl"`
+	}
+	
+	if err := c.BodyParser(&updateData); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid request body",
+			},
+		})
+	}
+	
+	// Validate update data
+	if validationErrors := utils.ValidateStruct(updateData); len(validationErrors) > 0 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Validation failed",
+				"details": validationErrors,
+			},
+		})
+	}
+	
+	// Update product fields
+	product.Title = updateData.Title
+	product.Description = updateData.Description
+	product.Category = updateData.Category
+	product.Price = updateData.Price
+	product.Tags = updateData.Tags
+	if updateData.ImageUrl != "" {
+		product.ImageURL = updateData.ImageUrl
+	}
+	
+	if err := database.DB.Save(&product).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to update product",
+			},
+		})
+	}
+	
+	return c.JSON(product)
 }
 
 // DeleteProduct deletes product
 func DeleteProduct(c *fiber.Ctx) error {
-	// Implementation placeholder
-	return c.JSON(fiber.Map{"message": "Not implemented"})
+	user := c.Locals("user").(*models.User)
+	id := c.Params("id")
+	
+	var product models.Product
+	if err := database.DB.Where("id = ?", id).First(&product).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Product not found",
+			},
+		})
+	}
+	
+	// Check if user owns the product or is admin
+	if product.AuthorID != user.ID && user.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "FORBIDDEN",
+				"message": "You can only delete your own products",
+			},
+		})
+	}
+	
+	// Soft delete by setting status to 'deleted'
+	if err := database.DB.Model(&product).Update("status", "deleted").Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to delete product",
+			},
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"message": "Product deleted successfully",
+	})
 }
 
 // ToggleLike toggles product like

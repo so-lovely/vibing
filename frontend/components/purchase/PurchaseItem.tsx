@@ -2,7 +2,8 @@ import type { PurchaseHistoryItem } from '../../types/purchase';
 import { usePurchase } from '../../contexts/PurchaseContext';
 import { Card } from '../ui/card';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { ProductInfo } from './ProductInfo';
+import { getStatusBadge } from '../../utils/purchaseUtils';
 import { Download, Calendar, CreditCard, ExternalLink } from 'lucide-react';
 
 interface PurchaseItemProps {
@@ -11,21 +12,6 @@ interface PurchaseItemProps {
 
 export function PurchaseItem({ purchase }: PurchaseItemProps) {
   const { downloadProduct } = usePurchase();
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-800">완료</Badge>;
-      case 'pending':
-        return <Badge variant="default" className="bg-yellow-100 text-yellow-800">대기중</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">실패</Badge>;
-      case 'refunded':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">환불</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR', {
@@ -40,32 +26,20 @@ export function PurchaseItem({ purchase }: PurchaseItemProps) {
   return (
     <Card className="p-6">
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Product Image */}
-        <div className="flex-shrink-0">
-          <img 
-            src={purchase.product.imageUrl} 
-            alt={purchase.product.title}
-            className="w-24 h-24 lg:w-32 lg:h-32 object-cover rounded-lg"
-          />
-        </div>
-
         {/* Product Details */}
         <div className="flex-grow space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                {purchase.product.title}
-              </h3>
-              <p className="text-gray-600 text-sm mb-2">
-                by {purchase.product.author}
-              </p>
+            <div className="flex-1">
+              <ProductInfo 
+                product={purchase.product} 
+                price={purchase.price}
+                showCategory={false}
+                size="lg"
+              />
             </div>
             
             <div className="flex flex-col items-start lg:items-end gap-2">
               {getStatusBadge(purchase.status)}
-              <div className="text-2xl font-bold text-gray-900">
-                ${purchase.price.toFixed(2)}
-              </div>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { chatApi, type Conversation as ApiConversation, type ChatMessage as ApiChatMessage } from '../services/chatApi';
 
 export interface ChatMessage {
   id: string;
@@ -8,20 +9,24 @@ export interface ChatMessage {
   senderName: string;
   senderRole: 'buyer' | 'seller';
   timestamp: Date;
+  isRead: boolean;
   avatar?: string;
 }
 
 export interface Conversation {
   id: string;
-  buyerId: string;
-  buyerName: string;
-  sellerId: string;
-  sellerName: string;
+  otherUserId: string;
+  otherUserName: string;
   productId?: string;
   productName?: string;
-  lastMessage?: ChatMessage;
+  lastMessage?: {
+    text: string;
+    timestamp: string;
+    senderId: string;
+  };
   unreadCount: number;
   messages: ChatMessage[];
+  otherPartyDeleted?: boolean;
 }
 
 interface ChatContextType {
@@ -30,12 +35,15 @@ interface ChatContextType {
   isOpen: boolean;
   isTyping: boolean;
   unreadCount: number;
+  loading: boolean;
   toggleChat: () => void;
-  sendMessage: (text: string, conversationId: string) => void;
-  startConversation: (sellerId: string, sellerName: string, productId?: string, productName?: string) => string;
+  sendMessage: (text: string, conversationId: string) => Promise<void>;
+  startConversation: (sellerId: string, sellerName: string, productId?: string, productName?: string) => Promise<string>;
   selectConversation: (conversationId: string) => void;
-  markAsRead: (conversationId: string) => void;
+  markAsRead: (conversationId: string) => Promise<void>;
+  loadMessages: (conversationId: string) => Promise<void>;
   getActiveConversation: () => Conversation | null;
+  closeConversation: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -58,42 +66,122 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const unreadCount = conversations.reduce((total, conv) => total + conv.unreadCount, 0);
 
+  // Load conversations from API when user changes
+  const loadConversations = useCallback(async () => {
+    if (!user) {
+      setConversations([]);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await chatApi.getConversations();
+      setConversations((response.conversations || []).map(conv => ({
+        ...conv,
+        messages: []
+      })));
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Reload conversations while preserving existing messages
+  const reloadConversationsPreservingMessages = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const response = await chatApi.getConversations();
+      setConversations(prev => {
+        const updatedConversations = (response.conversations || []).map(apiConv => {
+          const existingConv = prev.find(conv => conv.id === apiConv.id);
+          return {
+            ...apiConv,
+            messages: existingConv?.messages || []
+          };
+        });
+        return updatedConversations;
+      });
+    } catch (error) {
+      console.error('Failed to reload conversations:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Poll for new messages every 5 seconds
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(() => {
+      reloadConversationsPreservingMessages();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [user, reloadConversationsPreservingMessages]);
+
   const toggleChat = () => {
+    const wasOpen = isOpen;
     setIsOpen(!isOpen);
+    
+    // When opening chat, refresh conversations
+    if (!wasOpen && user) {
+      reloadConversationsPreservingMessages();
+    }
   };
 
-  const startConversation = (sellerId: string, sellerName: string, productId?: string, productName?: string): string => {
+  const startConversation = async (sellerId: string, sellerName: string, productId?: string, productName?: string): Promise<string> => {
     if (!user) return '';
 
-    // Check if conversation already exists
-    const existingConv = conversations.find(conv => 
-      conv.buyerId === user.id && conv.sellerId === sellerId && conv.productId === productId
-    );
-
-    if (existingConv) {
-      setActiveConversationId(existingConv.id);
-      return existingConv.id;
+    try {
+      const response = await chatApi.createConversation({
+        sellerId,
+        sellerName,
+        productId,
+        productName
+      });
+      
+      const conversationId = response.conversation.id;
+      
+      // Add the new conversation to local state immediately
+      const newConversation: Conversation = {
+        id: conversationId,
+        otherUserId: sellerId,
+        otherUserName: sellerName,
+        productId,
+        productName,
+        unreadCount: 0,
+        messages: []
+      };
+      
+      setConversations(prev => {
+        // Check if conversation already exists
+        const existingIndex = prev.findIndex(conv => conv.id === conversationId);
+        if (existingIndex >= 0) {
+          return prev;
+        }
+        return [newConversation, ...prev];
+      });
+      
+      setActiveConversationId(conversationId);
+      
+      // Reload conversations to get updated data from server
+      setTimeout(() => {
+        reloadConversationsPreservingMessages();
+      }, 500);
+      
+      return conversationId;
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      return '';
     }
-
-    // Create new conversation
-    const newConversation: Conversation = {
-      id: `conv_${Date.now()}`,
-      buyerId: user.id,
-      buyerName: user.name,
-      sellerId,
-      sellerName,
-      productId,
-      productName,
-      unreadCount: 0,
-      messages: []
-    };
-
-    setConversations(prev => [...prev, newConversation]);
-    setActiveConversationId(newConversation.id);
-    return newConversation.id;
   };
 
   const selectConversation = (conversationId: string) => {
@@ -101,76 +189,105 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     markAsRead(conversationId);
   };
 
-  const sendMessage = (text: string, conversationId: string) => {
+  const sendMessage = async (text: string, conversationId: string) => {
     if (!user) return;
 
-    const message: ChatMessage = {
-      id: `msg_${Date.now()}`,
-      text,
-      senderId: user.id,
-      senderName: user.name,
-      senderRole: user.role === 'seller' ? 'seller' : 'buyer',
-      timestamp: new Date()
-    };
-
-    setConversations(prev => prev.map(conv => {
-      if (conv.id === conversationId) {
-        const updatedConv = {
-          ...conv,
-          messages: [...conv.messages, message],
-          lastMessage: message
-        };
-        return updatedConv;
-      }
-      return conv;
-    }));
-
-    // Simulate typing indicator for the other party
-    setIsTyping(true);
-    
-    // Simulate response from the other party
-    setTimeout(() => {
-      setIsTyping(false);
+    try {
+      const response = await chatApi.sendMessage(conversationId, { text });
       
-      const conversation = conversations.find(c => c.id === conversationId);
-      if (!conversation) return;
-
-      const isUserSeller = user.role === 'seller';
-      const responseMessage: ChatMessage = {
-        id: `msg_${Date.now() + 1}`,
-        text: isUserSeller 
-          ? "Thank you for your interest! I'll get back to you soon with more details."
-          : "Thanks for reaching out! I'm happy to help with any questions about this product.",
-        senderId: isUserSeller ? conversation.buyerId : conversation.sellerId,
-        senderName: isUserSeller ? conversation.buyerName : conversation.sellerName,
-        senderRole: isUserSeller ? 'buyer' : 'seller',
-        timestamp: new Date()
+      // Add message to local state for immediate UI update
+      const newMessage: ChatMessage = {
+        id: response.message.id,
+        text: response.message.text,
+        senderId: response.message.senderId,
+        senderName: response.message.senderName,
+        senderRole: response.message.senderRole,
+        timestamp: new Date(response.message.timestamp),
+        isRead: response.message.isRead
       };
 
       setConversations(prev => prev.map(conv => {
         if (conv.id === conversationId) {
           return {
             ...conv,
-            messages: [...conv.messages, responseMessage],
-            lastMessage: responseMessage,
-            unreadCount: !isOpen ? conv.unreadCount + 1 : conv.unreadCount
+            messages: [...conv.messages, newMessage],
+            lastMessage: {
+              text: newMessage.text,
+              timestamp: response.message.timestamp,
+              senderId: newMessage.senderId
+            }
           };
         }
         return conv;
       }));
-    }, 1000 + Math.random() * 2000);
+
+      // Reload conversations to get updated unread counts but preserve existing messages
+      setTimeout(() => {
+        reloadConversationsPreservingMessages();
+      }, 500);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
-  const markAsRead = (conversationId: string) => {
-    setConversations(prev => prev.map(conv => 
-      conv.id === conversationId 
-        ? { ...conv, unreadCount: 0 }
-        : conv
-    ));
+  const markAsRead = async (conversationId: string) => {
+    try {
+      await chatApi.markAsRead(conversationId);
+      
+      // Update local state
+      setConversations(prev => prev.map(conv => 
+        conv.id === conversationId 
+          ? { ...conv, unreadCount: 0 }
+          : conv
+      ));
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+    }
+  };
+
+  const loadMessages = async (conversationId: string) => {
+    try {
+      const response = await chatApi.getMessages(conversationId);
+      const messages: ChatMessage[] = response.messages.map(msg => ({
+        id: msg.id,
+        text: msg.text,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderRole: msg.senderRole,
+        timestamp: new Date(msg.timestamp),
+        isRead: msg.isRead
+      }));
+
+      setConversations(prev => prev.map(conv => 
+        conv.id === conversationId 
+          ? { ...conv, messages: messages } // Keep original order - newest last
+          : conv
+      ));
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
   };
 
   const getActiveConversation = (): Conversation | null => {
     return conversations.find(conv => conv.id === activeConversationId) || null;
+  };
+
+  const closeConversation = async () => {
+    if (activeConversationId) {
+      try {
+        // Delete conversation on server
+        await chatApi.deleteConversation(activeConversationId);
+        
+        // Remove conversation from local state
+        setConversations(prev => prev.filter(conv => conv.id !== activeConversationId));
+        setActiveConversationId(null);
+      } catch (error) {
+        console.error('Failed to delete conversation:', error);
+        // Still remove from local state even if server call fails
+        setConversations(prev => prev.filter(conv => conv.id !== activeConversationId));
+        setActiveConversationId(null);
+      }
+    }
   };
 
   return (
@@ -181,12 +298,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         isOpen,
         isTyping,
         unreadCount,
+        loading,
         toggleChat,
         sendMessage,
         startConversation,
         selectConversation,
         markAsRead,
-        getActiveConversation
+        loadMessages,
+        getActiveConversation,
+        closeConversation
       }}
     >
       {children}
