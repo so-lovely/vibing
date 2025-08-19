@@ -48,17 +48,28 @@ func GetPurchaseHistory(c *fiber.Ctx) error {
 			"status":       purchase.Status,
 			"orderId":      purchase.OrderID,
 			"paymentMethod": purchase.PaymentMethod,
+			"displayStatus": purchase.GetDisplayStatus(),
+			"canRequestDispute": purchase.CanRequestDispute(),
 		}
 		
+		// Ensure product is included even if empty
+		productData := fiber.Map{
+			"id":       "",
+			"title":    "",
+			"imageUrl": "",
+			"author":   "",
+		}
 		if purchase.Product.ID != "" {
-			purchaseData["product"] = fiber.Map{
+			productData = fiber.Map{
 				"id":       purchase.Product.ID,
 				"title":    purchase.Product.Title,
 				"imageUrl": purchase.Product.ImageURL,
 				"author":   purchase.Product.Author,
 			}
 		}
+		purchaseData["product"] = productData
 		
+		// Add optional fields
 		if purchase.DownloadURL != nil {
 			purchaseData["downloadUrl"] = *purchase.DownloadURL
 		}
@@ -66,10 +77,6 @@ func GetPurchaseHistory(c *fiber.Ctx) error {
 		if purchase.LicenseKey != nil {
 			purchaseData["licenseKey"] = *purchase.LicenseKey
 		}
-		
-		// Add dispute information
-		purchaseData["displayStatus"] = purchase.GetDisplayStatus()
-		purchaseData["canRequestDispute"] = purchase.CanRequestDispute()
 		
 		if purchase.DisputeReason != nil {
 			purchaseData["disputeReason"] = *purchase.DisputeReason

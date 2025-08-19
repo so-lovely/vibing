@@ -18,7 +18,7 @@ interface ProductEditFormProps {
     imageFile: File | null;
     productFile: File | null;
   };
-  onInputChange: (field: string, value: string | File | null | string[]) => void;
+  onInputChange: (field: string, value: string | File | File[] | string[] | null) => void;
   onSubmit: () => void;
   onCancel: () => void;
   isEditing: boolean;

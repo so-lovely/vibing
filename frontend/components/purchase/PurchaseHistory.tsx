@@ -60,6 +60,8 @@ export default function PurchaseHistory() {
         throw new Error('Authentication required');
       }
 
+      console.log('Fetching purchase history...', { currentPage, token: token.substring(0, 20) + '...' });
+
       const response = await fetch(`/api/purchase/history?page=${currentPage}&limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -68,14 +70,25 @@ export default function PurchaseHistory() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch purchase history');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', { status: response.status, errorData });
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: Failed to fetch purchase history`);
       }
 
       const data = await response.json();
-      setPurchases(data.purchases || []);
-      setPagination(data.pagination);
+      console.log('Purchase history response:', data);
+      
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format');
+      }
+      
+      setPurchases(Array.isArray(data.purchases) ? data.purchases : []);
+      setPagination(data.pagination || null);
     } catch (error) {
       console.error('Error fetching purchase history:', error);
+      // Show error to user
+      alert(`구매 내역을 불러오는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     } finally {
       setLoading(false);
     }

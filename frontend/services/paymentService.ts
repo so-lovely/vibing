@@ -113,7 +113,7 @@ class PaymentService {
       if (amount) params.append('amount', amount.toString());
       if (customerEmail) params.append('customerEmail', customerEmail);
       
-      const url = `/api/payments/verify/${paymentId}${params.toString() ? '?' + params.toString() : ''}`;
+      const url = `http://localhost:8080/api/payments/verify/${paymentId}${params.toString() ? '?' + params.toString() : ''}`;
       
       const response = await fetch(url, {
         method: 'POST',
@@ -124,8 +124,19 @@ class PaymentService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Payment verification failed');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          // If response is empty or invalid JSON, provide a generic error
+          throw new Error(`Payment verification failed with status ${response.status}`);
+        }
+        
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in again.');
+        }
+        
+        throw new Error(errorData.error?.message || `Payment verification failed with status ${response.status}`);
       }
 
       const result = await response.json();

@@ -32,7 +32,7 @@ interface SellContextType {
   products: Product[];
   stats: SellerStats;
   loading: boolean;
-  updateFormData: (field: string, value: string | File | File[] | string[]) => void;
+  updateFormData: (field: string, value: string | File | File[] | string[] | null) => void;
   uploadProduct: () => Promise<void>;
   updateProduct: () => Promise<void>;
   resetForm: () => void;
@@ -99,7 +99,7 @@ export function SellProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateFormData = (field: string, value: string | File | File[] | string[]) => {
+  const updateFormData = (field: string, value: string | File | File[] | string[] | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 

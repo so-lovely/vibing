@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { adminApi, type AdminStats } from '../services/adminApi';
+
+export type { AdminStats };
 import type { User } from '../types/auth';
 import type { Product } from '../types/product';
 

@@ -77,10 +77,20 @@ export function PurchaseProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
+      console.log('Loading purchase history...', { page });
+      
       const response = await purchaseApi.getPurchaseHistory(page, 10);
-      setPurchaseHistory(response.purchases || []);
-      setPagination(response.pagination);
+      console.log('Purchase history loaded:', response);
+      
+      // Validate response structure
+      if (!response || typeof response !== 'object') {
+        throw new Error('Invalid API response structure');
+      }
+      
+      setPurchaseHistory(Array.isArray(response.purchases) ? response.purchases : []);
+      setPagination(response.pagination || null);
     } catch (err) {
+      console.error('Failed to load purchase history:', err);
       setError(err instanceof Error ? err.message : 'Failed to load purchase history');
       // Don't set purchaseHistory to null on error, keep existing data
     } finally {

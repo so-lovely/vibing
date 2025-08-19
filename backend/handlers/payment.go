@@ -146,12 +146,22 @@ func VerifyPayment(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Extract product info from order name (format: "ProductTitle - Vibing Marketplace")
-	productTitle := strings.Replace(orderName, " - Vibing Marketplace", "", 1)
+	// Extract product info from order name (format: "ProductTitle - ProductID - Vibing Marketplace")
+	parts := strings.Split(orderName, " - ")
+	if len(parts) < 3 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid order name format",
+			},
+		})
+	}
 	
-	// Find product by title
+	productID := parts[len(parts)-2] // ProductID is the second to last part
+	
+	// Find product by ID (more reliable than title)
 	var product models.Product
-	if err := database.DB.Where("title = ? AND status = ?", productTitle, "active").First(&product).Error; err != nil {
+	if err := database.DB.Where("id = ? AND status = ?", productID, "active").First(&product).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "NOT_FOUND",
@@ -172,13 +182,13 @@ func VerifyPayment(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Create purchase record
+	// Create purchase record with all required fields
 	purchase := models.Purchase{
-		UserID:        user.ID,
-		ProductID:     product.ID,
-		Price:         product.Price,
-		Status:        "completed",
-		PaymentMethod: "toss_pay",
+		UserID:         user.ID,
+		ProductID:      product.ID,
+		Price:          product.Price,
+		Status:         "completed",
+		PaymentMethod:  "toss_pay",
 		TossPaymentKey: paymentId,
 	}
 	
@@ -187,6 +197,16 @@ func VerifyPayment(c *fiber.Ctx) error {
 			"error": fiber.Map{
 				"code":    "INTERNAL_ERROR",
 				"message": "Failed to create purchase record",
+			},
+		})
+	}
+	
+	// Load the product relation for proper response formatting
+	if err := database.DB.Preload("Product").First(&purchase, "id = ?", purchase.ID).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to load purchase details",
 			},
 		})
 	}

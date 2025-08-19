@@ -39,7 +39,7 @@ export function ProductImageCard({ product }: ProductImageCardProps) {
       <CardContent className="p-6">
         <div className="relative">
           <ImageWithFallback 
-            src={product.imageUrl}
+            src={product.imageUrl || ''}
             alt={product.title}
             className="w-full h-64 object-cover rounded-lg"
           />

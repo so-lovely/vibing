@@ -4,22 +4,10 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { convertUsdToKrw, formatPrice } from '../../utils/purchaseUtils';
-
-interface SellerProduct {
-  id: string;
-  title: string;
-  category: string;
-  price: number;
-  sales: number;
-  revenue: number;
-  views: number;
-  downloads: number;
-  status: 'active' | 'pending' | 'rejected';
-  createdAt: string;
-}
+import type { Product } from '../../types/product';
 
 interface SellerDashboardProps {
-  products: SellerProduct[];
+  products: Product[];
   stats: {
     totalRevenue: number;
     totalSales: number;
@@ -123,8 +111,8 @@ export function SellerDashboard({
                   <TableCell className="font-medium">{product.title}</TableCell>
                   <TableCell>{product.category}</TableCell>
                   <TableCell>{formatPrice(convertUsdToKrw(product.price || 0))}</TableCell>
-                  <TableCell>{product.sales || 0}</TableCell>
-                  <TableCell>{formatPrice(convertUsdToKrw(product.revenue || 0))}</TableCell>
+                  <TableCell>{product.downloads || 0}</TableCell>
+                  <TableCell>{formatPrice(convertUsdToKrw((product.downloads || 0) * product.price))}</TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
                       <Eye className="w-4 h-4" />

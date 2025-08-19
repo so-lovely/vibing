@@ -4,10 +4,12 @@ import { Check, X, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { paymentService } from '../services/paymentService';
+import { usePurchase } from '../contexts/PurchaseContext';
 
 export function PaymentSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { loadPurchaseHistory } = usePurchase();
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [paymentInfo, setPaymentInfo] = useState<{
     paymentId?: string;
@@ -37,6 +39,13 @@ export function PaymentSuccessPage() {
 
   const verifyPayment = async (paymentId: string, orderName?: string, amount?: number, customerEmail?: string) => {
     try {
+      console.log('Payment verification:', {
+        paymentId,
+        orderName,
+        amount,
+        customerEmail
+      });
+      
       const result = await paymentService.verifyPayment(paymentId, orderName, amount, customerEmail);
       
       if (result.success) {
@@ -45,6 +54,14 @@ export function PaymentSuccessPage() {
           paymentId: result.paymentId,
           amount: result.amount,
         });
+        // Refresh purchase history after successful payment verification
+        try {
+          await loadPurchaseHistory();
+          console.log('Purchase history refreshed after payment verification');
+        } catch (historyError) {
+          console.error('Failed to refresh purchase history:', historyError);
+          // Don't fail the entire verification if history refresh fails
+        }
       } else {
         setVerificationStatus('failed');
         setPaymentInfo({

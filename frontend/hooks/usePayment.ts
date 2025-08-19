@@ -21,9 +21,18 @@ export function usePayment(): UsePaymentReturn {
     try {
       // Calculate total amount in KRW (USD product price -> KRW)
       const totalAmount = calculateTotal(product.price);
+      const orderName = `${product.title} - ${product.id} - Vibing Marketplace`;
+      
+      console.log('Payment Info:', {
+        productId: product.id,
+        productTitle: product.title,
+        orderName,
+        totalAmount,
+        customerEmail
+      });
       
       const result = await paymentService.initiateTossPayTest(
-        `${product.title} - Vibing Marketplace`,
+        orderName,
         totalAmount,
         customerEmail
       );
@@ -31,6 +40,41 @@ export function usePayment(): UsePaymentReturn {
       if (!result.success) {
         setError(result.errorMessage || 'Payment failed');
         return result;
+      }
+
+      console.log('Payment initiated successfully, now verifying...', result);
+
+      // After successful payment, verify it with backend to create purchase record
+      if (result.paymentId) {
+        try {
+          const verificationResult = await paymentService.verifyPayment(
+            result.paymentId,
+            orderName,
+            totalAmount,
+            customerEmail
+          );
+          
+          console.log('Payment verification result:', verificationResult);
+          
+          if (verificationResult.success) {
+            return {
+              ...result,
+              purchaseInfo: verificationResult.purchaseInfo
+            };
+          } else {
+            console.error('Payment verification failed:', verificationResult.errorMessage);
+            setError(verificationResult.errorMessage || 'Payment verification failed');
+            return verificationResult;
+          }
+        } catch (verifyError) {
+          console.error('Payment verification error:', verifyError);
+          const errorMessage = verifyError instanceof Error ? verifyError.message : 'Payment verification failed';
+          setError(errorMessage);
+          return {
+            success: false,
+            errorMessage,
+          };
+        }
       }
 
       return result;

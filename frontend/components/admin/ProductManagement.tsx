@@ -82,7 +82,7 @@ export function ProductManagement() {
                 <TableCell>
                   <div className="flex items-center space-x-3">
                     <img 
-                      src={product.image} 
+                      src={product.imageUrl} 
                       alt={product.title}
                       className="w-10 h-10 rounded object-cover"
                     />
@@ -146,7 +146,7 @@ export function ProductManagement() {
                 <AlertDialogDescription asChild>
                   <div className="space-y-4">
                     <img 
-                      src={viewingProduct.image} 
+                      src={viewingProduct.imageUrl} 
                       alt={viewingProduct.title}
                       className="w-full h-48 object-cover rounded"
                     />
