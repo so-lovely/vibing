@@ -8,6 +8,8 @@ export interface ChatMessage {
   senderRole: 'buyer' | 'seller';
   timestamp: string;
   isRead: boolean;
+  messageType: 'text' | 'image';
+  imageUrl?: string;
 }
 
 export interface Conversation {
@@ -18,7 +20,6 @@ export interface Conversation {
   productName?: string;
   unreadCount: number;
   updatedAt: string;
-  otherPartyDeleted?: boolean;
   lastMessage?: {
     text: string;
     timestamp: string;
@@ -67,8 +68,17 @@ export interface SendMessageRequest {
   text: string;
 }
 
+export interface SendImageRequest {
+  imageUrl: string;
+}
+
 export interface SendMessageResponse {
   message: ChatMessage;
+}
+
+export interface UploadImageResponse {
+  imageUrl: string;
+  message: string;
 }
 
 class ChatApiService {
@@ -97,10 +107,19 @@ class ChatApiService {
     return response;
   }
 
-  async deleteConversation(conversationId: string): Promise<{ message: string }> {
-    const response = await apiClient.delete<{ message: string }>(`/chat/conversations/${conversationId}`);
+  async uploadChatImage(file: File): Promise<UploadImageResponse> {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const response = await apiClient.post<UploadImageResponse>('/upload/chat-image', formData);
     return response;
   }
+
+  async sendImage(conversationId: string, data: SendImageRequest): Promise<SendMessageResponse> {
+    const response = await apiClient.post<SendMessageResponse>(`/chat/conversations/${conversationId}/images`, data);
+    return response;
+  }
+
 }
 
 export const chatApi = new ChatApiService();

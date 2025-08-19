@@ -26,14 +26,37 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         
         <div
           className={`
-            px-3 py-2 rounded-lg text-sm
+            ${message.messageType === 'image' ? 'p-1' : 'px-3 py-2'} rounded-lg text-sm
             ${isCurrentUser 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-muted text-foreground'
             }
           `}
         >
-          {message.text}
+          {message.messageType === 'image' ? (
+            <div className="relative">
+              <img 
+                src={message.imageUrl} 
+                alt="Chat image" 
+                className="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer"
+                onClick={() => window.open(message.imageUrl, '_blank')}
+              />
+              {!message.isRead && (
+                <div className={`absolute -top-2 -right-2 w-3 h-3 rounded-full ${
+                  isCurrentUser ? 'bg-white' : 'bg-primary'
+                } border-2 border-background`}></div>
+              )}
+            </div>
+          ) : (
+            <div className="relative">
+              {message.text}
+              {!message.isRead && (
+                <div className={`absolute -top-2 -right-2 w-3 h-3 rounded-full ${
+                  isCurrentUser ? 'bg-white' : 'bg-primary'
+                } border-2 border-background`}></div>
+              )}
+            </div>
+          )}
         </div>
         
         <div className="text-xs text-muted-foreground mt-1">

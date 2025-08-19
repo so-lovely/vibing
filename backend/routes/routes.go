@@ -95,8 +95,8 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	chatRoutes.Post("/conversations", handlers.CreateConversation)
 	chatRoutes.Get("/conversations/:id/messages", handlers.GetMessages)
 	chatRoutes.Post("/conversations/:id/messages", handlers.SendMessage)
+	chatRoutes.Post("/conversations/:id/images", handlers.SendImage)
 	chatRoutes.Put("/conversations/:id/read", handlers.MarkAsRead)
-	chatRoutes.Delete("/conversations/:id", handlers.DeleteConversation)
 
 	// Admin routes
 	adminRoutes := api.Group("/admin")
@@ -117,6 +117,7 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	uploadRoutes.Use(middleware.Auth(), middleware.UploadRateLimit())
 	uploadRoutes.Post("/image", middleware.SellerOnly(), handlers.UploadImage)
 	uploadRoutes.Post("/product-files", middleware.SellerOnly(), handlers.UploadProductFiles)
+	uploadRoutes.Post("/chat-image", handlers.UploadChatImage)
 	uploadRoutes.Get("/signed-url", middleware.SellerOnly(), handlers.GetSignedURL)
 
 	// Security routes

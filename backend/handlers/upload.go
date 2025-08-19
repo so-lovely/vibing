@@ -188,3 +188,42 @@ func GetSignedURL(c *fiber.Ctx) error {
 		"expiresIn": 3600, // 1 hour
 	})
 }
+
+// UploadChatImage uploads chat image
+func UploadChatImage(c *fiber.Ctx) error {
+	// Get file from form
+	file, err := c.FormFile("image")
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "No image file provided",
+			},
+		})
+	}
+
+	// Upload to S3
+	if s3Service == nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "SERVICE_ERROR",
+				"message": "File upload service not available",
+			},
+		})
+	}
+
+	imageURL, err := s3Service.UploadImage(file, "chat-images")
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "UPLOAD_ERROR",
+				"message": err.Error(),
+			},
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"imageUrl": imageURL,
+		"message":  "Chat image uploaded successfully",
+	})
+}

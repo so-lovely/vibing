@@ -10,6 +10,8 @@ export interface ChatMessage {
   senderRole: 'buyer' | 'seller';
   timestamp: Date;
   isRead: boolean;
+  messageType: 'text' | 'image';
+  imageUrl?: string;
   avatar?: string;
 }
 
@@ -26,7 +28,6 @@ export interface Conversation {
   };
   unreadCount: number;
   messages: ChatMessage[];
-  otherPartyDeleted?: boolean;
 }
 
 interface ChatContextType {
@@ -38,12 +39,12 @@ interface ChatContextType {
   loading: boolean;
   toggleChat: () => void;
   sendMessage: (text: string, conversationId: string) => Promise<void>;
+  sendImage: (file: File, conversationId: string) => Promise<void>;
   startConversation: (sellerId: string, sellerName: string, productId?: string, productName?: string) => Promise<string>;
   selectConversation: (conversationId: string) => void;
   markAsRead: (conversationId: string) => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
   getActiveConversation: () => Conversation | null;
-  closeConversation: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -203,7 +204,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         senderName: response.message.senderName,
         senderRole: response.message.senderRole,
         timestamp: new Date(response.message.timestamp),
-        isRead: response.message.isRead
+        isRead: response.message.isRead,
+        messageType: response.message.messageType || 'text',
+        imageUrl: response.message.imageUrl
       };
 
       setConversations(prev => prev.map(conv => {
@@ -255,7 +258,9 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         senderName: msg.senderName,
         senderRole: msg.senderRole,
         timestamp: new Date(msg.timestamp),
-        isRead: msg.isRead
+        isRead: msg.isRead,
+        messageType: msg.messageType || 'text',
+        imageUrl: msg.imageUrl
       }));
 
       setConversations(prev => prev.map(conv => 
@@ -268,27 +273,57 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   };
 
+  const sendImage = async (file: File, conversationId: string) => {
+    if (!user) return;
+
+    try {
+      // Upload image first
+      const uploadResponse = await chatApi.uploadChatImage(file);
+      
+      // Send image message
+      const response = await chatApi.sendImage(conversationId, { imageUrl: uploadResponse.imageUrl });
+      
+      // Add message to local state for immediate UI update
+      const newMessage: ChatMessage = {
+        id: response.message.id,
+        text: response.message.text,
+        senderId: response.message.senderId,
+        senderName: response.message.senderName,
+        senderRole: response.message.senderRole,
+        timestamp: new Date(response.message.timestamp),
+        isRead: response.message.isRead,
+        messageType: response.message.messageType || 'image',
+        imageUrl: response.message.imageUrl
+      };
+
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            messages: [...conv.messages, newMessage],
+            lastMessage: {
+              text: '[Image]',
+              timestamp: response.message.timestamp,
+              senderId: newMessage.senderId
+            }
+          };
+        }
+        return conv;
+      }));
+
+      // Reload conversations to get updated unread counts but preserve existing messages
+      setTimeout(() => {
+        reloadConversationsPreservingMessages();
+      }, 500);
+    } catch (error) {
+      console.error('Failed to send image:', error);
+    }
+  };
+
   const getActiveConversation = (): Conversation | null => {
     return conversations.find(conv => conv.id === activeConversationId) || null;
   };
 
-  const closeConversation = async () => {
-    if (activeConversationId) {
-      try {
-        // Delete conversation on server
-        await chatApi.deleteConversation(activeConversationId);
-        
-        // Remove conversation from local state
-        setConversations(prev => prev.filter(conv => conv.id !== activeConversationId));
-        setActiveConversationId(null);
-      } catch (error) {
-        console.error('Failed to delete conversation:', error);
-        // Still remove from local state even if server call fails
-        setConversations(prev => prev.filter(conv => conv.id !== activeConversationId));
-        setActiveConversationId(null);
-      }
-    }
-  };
 
   return (
     <ChatContext.Provider
@@ -301,12 +336,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         loading,
         toggleChat,
         sendMessage,
+        sendImage,
         startConversation,
         selectConversation,
         markAsRead,
         loadMessages,
-        getActiveConversation,
-        closeConversation
+        getActiveConversation
       }}
     >
       {children}

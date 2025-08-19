@@ -14,8 +14,6 @@ type Conversation struct {
 	SellerName      string    `json:"sellerName"`
 	ProductID       *string   `json:"productId"`
 	ProductName     *string   `json:"productName"`
-	BuyerDeleted    bool      `json:"-" gorm:"default:false"`
-	SellerDeleted   bool      `json:"-" gorm:"default:false"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 	DeletedAt       gorm.DeletedAt `json:"-" gorm:"index"`
@@ -30,7 +28,9 @@ type Conversation struct {
 type ChatMessage struct {
 	ID             string    `json:"id" gorm:"primaryKey"`
 	ConversationID string    `json:"conversationId" gorm:"not null"`
-	Text           string    `json:"text" gorm:"type:text;not null" validate:"required,min=1,max=2000"`
+	Text           string    `json:"text" gorm:"type:text"`
+	ImageURL       *string   `json:"imageUrl,omitempty" gorm:"type:text"`
+	MessageType    string    `json:"messageType" gorm:"type:varchar(20);default:'text';check:message_type IN ('text','image')" validate:"oneof=text image"`
 	SenderID       string    `json:"senderId" gorm:"not null"`
 	SenderName     string    `json:"senderName"`
 	SenderRole     string    `json:"senderRole" gorm:"type:varchar(20);check:sender_role IN ('buyer','seller')" validate:"oneof=buyer seller"`
@@ -112,6 +112,7 @@ func (c *Conversation) AddMessage(db *gorm.DB, senderID, senderName, senderRole,
 	message := &ChatMessage{
 		ConversationID: c.ID,
 		Text:           text,
+		MessageType:    "text",
 		SenderID:       senderID,
 		SenderName:     senderName,
 		SenderRole:     senderRole,
@@ -128,48 +129,25 @@ func (c *Conversation) AddMessage(db *gorm.DB, senderID, senderName, senderRole,
 	return message, nil
 }
 
-// SoftDeleteForUser marks conversation as deleted for a specific user
-func (c *Conversation) SoftDeleteForUser(db *gorm.DB, userID string) error {
-	updateData := make(map[string]interface{})
-	
-	if c.BuyerID == userID {
-		updateData["buyer_deleted"] = true
-	} else if c.SellerID == userID {
-		updateData["seller_deleted"] = true
-	} else {
-		return nil // User not part of this conversation
+// AddImageMessage adds a new image message to the conversation
+func (c *Conversation) AddImageMessage(db *gorm.DB, senderID, senderName, senderRole, imageURL string) (*ChatMessage, error) {
+	message := &ChatMessage{
+		ConversationID: c.ID,
+		ImageURL:       &imageURL,
+		MessageType:    "image",
+		SenderID:       senderID,
+		SenderName:     senderName,
+		SenderRole:     senderRole,
+		IsRead:         false,
 	}
-	
-	return db.Model(c).Where("id = ?", c.ID).Updates(updateData).Error
+
+	if err := db.Create(message).Error; err != nil {
+		return nil, err
+	}
+
+	// Update conversation's updated_at timestamp
+	db.Model(c).Update("updated_at", time.Now())
+
+	return message, nil
 }
 
-// IsDeletedForUser checks if conversation is deleted for a specific user
-func (c *Conversation) IsDeletedForUser(userID string) bool {
-	if c.BuyerID == userID {
-		return c.BuyerDeleted
-	} else if c.SellerID == userID {
-		return c.SellerDeleted
-	}
-	return false
-}
-
-// UndeleteForUser marks conversation as not deleted for a specific user and resets both parties' deletion status
-func (c *Conversation) UndeleteForUser(db *gorm.DB, userID string) error {
-	updateData := make(map[string]interface{})
-	
-	if c.BuyerID == userID {
-		updateData["buyer_deleted"] = false
-		updateData["seller_deleted"] = false  // Reset both parties when restarting conversation
-		c.BuyerDeleted = false
-		c.SellerDeleted = false
-	} else if c.SellerID == userID {
-		updateData["seller_deleted"] = false
-		updateData["buyer_deleted"] = false   // Reset both parties when restarting conversation
-		c.SellerDeleted = false
-		c.BuyerDeleted = false
-	} else {
-		return nil // User not part of this conversation
-	}
-	
-	return db.Model(c).Where("id = ?", c.ID).Updates(updateData).Error
-}

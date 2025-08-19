@@ -149,8 +149,11 @@ func (s *S3Service) UploadImage(file *multipart.FileHeader, folder string) (stri
 		return "", err
 	}
 
-	// Return public URL
-	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, *s.client.Config.Region, filename)
+	// Return presigned URL (valid for 7 days for images)
+	url, err := s.GeneratePresignedURL(filename, 7*24*time.Hour)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %v", err)
+	}
 	return url, nil
 }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, X, ArrowLeft, XCircle } from 'lucide-react';
+import { MessageCircle, X, ArrowLeft } from 'lucide-react';
 import { useChat } from '../../contexts/ChatContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChatMessage } from './ChatMessage';
@@ -19,10 +19,10 @@ export const ChatWidget: React.FC = () => {
     loading,
     toggleChat, 
     sendMessage,
+    sendImage,
     selectConversation,
     loadMessages,
-    getActiveConversation,
-    closeConversation
+    getActiveConversation
   } = useChat();
   
   const [view, setView] = useState<'list' | 'chat'>('list');
@@ -67,10 +67,6 @@ export const ChatWidget: React.FC = () => {
     setView('list');
   };
 
-  const handleCloseConversation = () => {
-    closeConversation();
-    setView('list');
-  };
 
   if (!user) {
     return null;
@@ -102,27 +98,14 @@ export const ChatWidget: React.FC = () => {
                 }
               </h3>
             </div>
-            <div className="flex items-center gap-1">
-              {view === 'chat' && activeConversation && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCloseConversation}
-                  className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
-                  title="대화 종료"
-                >
-                  <XCircle className="h-3 w-3" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleChat}
-                className="h-6 w-6 p-0"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleChat}
+              className="h-6 w-6 p-0"
+            >
+              <X className="h-3 w-3" />
+            </Button>
           </div>
 
           {/* Content */}
@@ -148,18 +131,8 @@ export const ChatWidget: React.FC = () => {
                   <ChatMessage key={message.id} message={message} />
                 ))}
                 
-                {/* Show deleted conversation notice if other party deleted */}
-                {activeConversation.otherPartyDeleted && (
-                  <div className="text-center text-muted-foreground py-4">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-red-600 font-medium text-sm">상대방이 채팅을 종료했습니다</p>
-                      <p className="text-red-500 text-xs mt-1">더 이상 메시지를 보낼 수 없습니다</p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Typing Indicator - only show if conversation is not deleted by other party */}
-                {!activeConversation.otherPartyDeleted && isTyping && (
+                {/* Typing Indicator */}
+                {isTyping && (
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-xs">
                       🛍️
@@ -177,14 +150,13 @@ export const ChatWidget: React.FC = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input - only show if conversation is not deleted by other party */}
-              {!activeConversation.otherPartyDeleted && (
-                <ChatInput 
-                  onSendMessage={sendMessage} 
-                  conversationId={activeConversation.id}
-                  disabled={isTyping} 
-                />
-              )}
+              {/* Input */}
+              <ChatInput 
+                onSendMessage={sendMessage}
+                onSendImage={sendImage}
+                conversationId={activeConversation.id}
+                disabled={isTyping} 
+              />
             </>
           )}
         </div>

@@ -1,9 +1,12 @@
 package services
 
 import (
+	"fmt"
 	"log"
+	"strings"
 	"time"
 
+	"vibing-backend/config"
 	"vibing-backend/database"
 	"vibing-backend/models"
 )
@@ -59,7 +62,7 @@ func (s *SchedulerService) processAutoConfirmations() {
 
 	// Find purchases that should be auto-confirmed
 	err := database.DB.Where("status = ? AND auto_confirm_at IS NOT NULL AND auto_confirm_at <= ?", 
-		"completed", time.Now()).Find(&purchases).Error
+		"completed", time.Now()).Preload("Product").Find(&purchases).Error
 	
 	if err != nil {
 		log.Printf("Error finding purchases for auto-confirmation: %v", err)
@@ -72,6 +75,12 @@ func (s *SchedulerService) processAutoConfirmations() {
 			if err := purchase.AutoConfirm(); err != nil {
 				log.Printf("Error auto-confirming purchase %s: %v", purchase.ID, err)
 				continue
+			}
+
+			// Delete S3 file after confirmation
+			if err := deleteS3FileForPurchase(purchase); err != nil {
+				log.Printf("Warning: Failed to delete S3 file for purchase %s: %v", purchase.ID, err)
+				// Don't fail the confirmation process if file deletion fails
 			}
 
 			if err := database.DB.Save(&purchase).Error; err != nil {
@@ -159,12 +168,18 @@ func (s *SchedulerService) GetPendingInterventions() ([]models.Purchase, error) 
 // ForceAutoConfirm manually triggers auto-confirmation for a purchase (admin use)
 func (s *SchedulerService) ForceAutoConfirm(purchaseID string) error {
 	var purchase models.Purchase
-	if err := database.DB.Where("id = ?", purchaseID).First(&purchase).Error; err != nil {
+	if err := database.DB.Where("id = ?", purchaseID).Preload("Product").First(&purchase).Error; err != nil {
 		return err
 	}
 
 	if err := purchase.AutoConfirm(); err != nil {
 		return err
+	}
+
+	// Delete S3 file after confirmation
+	if err := deleteS3FileForPurchase(purchase); err != nil {
+		log.Printf("Warning: Failed to delete S3 file for purchase %s: %v", purchase.ID, err)
+		// Don't fail the confirmation process if file deletion fails
 	}
 
 	return database.DB.Save(&purchase).Error
@@ -198,4 +213,48 @@ func StopScheduler() {
 	if PurchaseScheduler != nil {
 		PurchaseScheduler.Stop()
 	}
+}
+
+// deleteS3FileForPurchase deletes the S3 file for a purchase
+func deleteS3FileForPurchase(purchase models.Purchase) error {
+	if purchase.Product.FileURL == "" {
+		return nil // No file to delete
+	}
+	
+	// Extract S3 key from the full S3 URL
+	s3Key := extractS3KeyFromURL(purchase.Product.FileURL)
+	if s3Key == "" {
+		return fmt.Errorf("failed to extract S3 key from URL: %s", purchase.Product.FileURL)
+	}
+	
+	// Load S3 configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %v", err)
+	}
+	
+	// Create S3 service
+	s3Service, err := NewS3Service(&cfg.S3)
+	if err != nil {
+		return fmt.Errorf("failed to create S3 service: %v", err)
+	}
+	
+	// Delete the file
+	if err := s3Service.DeleteFile(s3Key); err != nil {
+		return fmt.Errorf("failed to delete S3 file: %v", err)
+	}
+	
+	log.Printf("Successfully deleted S3 file for purchase %s: %s", purchase.ID, s3Key)
+	return nil
+}
+
+// extractS3KeyFromURL extracts the S3 object key from a full S3 URL
+// Example: https://bucket.s3.region.amazonaws.com/path/to/file.zip -> path/to/file.zip
+func extractS3KeyFromURL(s3URL string) string {
+	// Split by ".amazonaws.com/"
+	parts := strings.Split(s3URL, ".amazonaws.com/")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
 }

@@ -91,7 +91,7 @@ func (p *Purchase) IncrementDownload(db *gorm.DB) error {
 // GenerateDownloadURL creates a secure download URL
 func (p *Purchase) GenerateDownloadURL() string {
 	// Return the actual file URL from the product
-	// In production, this could be a pre-signed S3 URL for security
+	// Pre-signed URL generation will be handled in the handler
 	if p.Product.FileURL != "" {
 		return p.Product.FileURL
 	}
@@ -168,6 +168,7 @@ func (p *Purchase) ResolveDispute(resolution string, refund bool) error {
 		p.Status = "refunded"
 	} else {
 		p.Status = "confirmed"
+		// Note: S3 file deletion will be handled in the service layer
 	}
 	
 	return nil
@@ -192,6 +193,7 @@ func (p *Purchase) AutoConfirm() error {
 	}
 	
 	p.Status = "confirmed"
+	// Note: S3 file deletion will be handled in the service layer
 	return nil
 }
 

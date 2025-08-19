@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"vibing-backend/config"
 	"vibing-backend/database"
 	"vibing-backend/models"
+	"vibing-backend/services"
 )
 
 // GetPurchaseHistory returns user's purchase history with pagination
@@ -69,9 +73,13 @@ func GetPurchaseHistory(c *fiber.Ctx) error {
 		}
 		purchaseData["product"] = productData
 		
-		// Add optional fields
-		if purchase.DownloadURL != nil {
-			purchaseData["downloadUrl"] = *purchase.DownloadURL
+		// Add download URL (generate pre-signed URL for security)
+		if purchase.Status == "completed" {
+			fmt.Printf("DEBUG: Purchase %s is completed, generating download URL\n", purchase.ID)
+			downloadURL := generatePresignedDownloadURLWithExpiry(purchase.Product.FileURL, purchase.ID, purchase.AutoConfirmAt)
+			purchaseData["downloadUrl"] = downloadURL
+		} else {
+			fmt.Printf("DEBUG: Purchase %s status is: %s, not generating download URL\n", purchase.ID, purchase.Status)
 		}
 		
 		if purchase.LicenseKey != nil {
@@ -136,11 +144,8 @@ func GetDownloadURL(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Use the actual file URL from the product as download URL
-	downloadURL := purchase.Product.FileURL
-	if downloadURL == "" {
-		downloadURL = "https://download.vibing.com/secure/" + purchaseID
-	}
+	// Generate pre-signed URL for secure download
+	downloadURL := generatePresignedDownloadURL(purchase.Product.FileURL, purchaseID)
 	expiresAt := time.Now().Add(1 * time.Hour)
 	
 	return c.JSON(fiber.Map{
@@ -458,6 +463,14 @@ func ResolveDispute(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Delete S3 file if dispute is resolved as confirmed (not refunded)
+	if !req.Refund && purchase.Status == "confirmed" {
+		if err := deleteS3FileForPurchase(purchase); err != nil {
+			fmt.Printf("Warning: Failed to delete S3 file for purchase %s: %v\n", purchase.ID, err)
+			// Don't fail the dispute resolution if file deletion fails
+		}
+	}
+	
 	if err := database.DB.Save(&purchase).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": fiber.Map{
@@ -554,4 +567,120 @@ func GetDisputedPurchases(c *fiber.Ctx) error {
 			"itemsPerPage": limit,
 		},
 	})
+}
+
+// generatePresignedDownloadURLWithExpiry generates a secure pre-signed S3 download URL valid until auto-confirm date
+func generatePresignedDownloadURLWithExpiry(fileURL, purchaseID string, autoConfirmAt *time.Time) string {
+	fmt.Printf("DEBUG: generatePresignedDownloadURLWithExpiry called with fileURL: %s, purchaseID: %s\n", fileURL, purchaseID)
+	
+	if fileURL == "" {
+		fmt.Printf("DEBUG: fileURL is empty, returning fallback\n")
+		return "https://download.vibing.com/secure/" + purchaseID
+	}
+	
+	// Calculate expiry duration (until auto-confirm date, max 7 days for AWS limits)
+	var expiry time.Duration
+	if autoConfirmAt != nil {
+		timeUntilConfirm := time.Until(*autoConfirmAt)
+		fmt.Printf("DEBUG: time until auto-confirm: %v\n", timeUntilConfirm)
+		
+		if timeUntilConfirm > 0 {
+			// AWS pre-signed URLs have a maximum validity of 7 days
+			maxDuration := 7 * 24 * time.Hour
+			if timeUntilConfirm > maxDuration {
+				expiry = maxDuration
+				fmt.Printf("DEBUG: using max duration (7 days) due to AWS limits\n")
+			} else {
+				expiry = timeUntilConfirm
+				fmt.Printf("DEBUG: using time until auto-confirm: %v\n", expiry)
+			}
+		} else {
+			fmt.Printf("DEBUG: auto-confirm time has passed, using 1 hour fallback\n")
+			expiry = 1 * time.Hour
+		}
+	} else {
+		fmt.Printf("DEBUG: no auto-confirm time set, using 1 hour fallback\n")
+		expiry = 1 * time.Hour
+	}
+	
+	// Extract S3 key from the full S3 URL
+	s3Key := extractS3Key(fileURL)
+	fmt.Printf("DEBUG: extracted S3 key: %s\n", s3Key)
+	if s3Key == "" {
+		fmt.Printf("DEBUG: failed to extract S3 key, returning original URL\n")
+		return fileURL
+	}
+	
+	// Load S3 configuration
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("DEBUG: failed to load config: %v\n", err)
+		return "https://download.vibing.com/secure/" + purchaseID
+	}
+	
+	// Create S3 service
+	s3Service, err := services.NewS3Service(&cfg.S3)
+	if err != nil {
+		fmt.Printf("DEBUG: failed to create S3 service: %v\n", err)
+		return "https://download.vibing.com/secure/" + purchaseID
+	}
+	
+	// Generate pre-signed URL with calculated expiry
+	presignedURL, err := s3Service.GeneratePresignedURL(s3Key, expiry)
+	if err != nil {
+		fmt.Printf("DEBUG: failed to generate pre-signed URL: %v\n", err)
+		return "https://download.vibing.com/secure/" + purchaseID
+	}
+	
+	fmt.Printf("DEBUG: successfully generated pre-signed URL valid for %v: %s\n", expiry, presignedURL[:100]+"...")
+	return presignedURL
+}
+
+// generatePresignedDownloadURL generates a secure pre-signed S3 download URL (backward compatibility)
+func generatePresignedDownloadURL(fileURL, purchaseID string) string {
+	return generatePresignedDownloadURLWithExpiry(fileURL, purchaseID, nil)
+}
+
+// extractS3Key extracts the S3 object key from a full S3 URL
+// Example: https://bucket.s3.region.amazonaws.com/path/to/file.zip -> path/to/file.zip
+func extractS3Key(s3URL string) string {
+	// Split by ".amazonaws.com/"
+	parts := strings.Split(s3URL, ".amazonaws.com/")
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
+}
+
+// deleteS3FileForPurchase deletes the S3 file for a purchase
+func deleteS3FileForPurchase(purchase models.Purchase) error {
+	if purchase.Product.FileURL == "" {
+		return nil // No file to delete
+	}
+	
+	// Extract S3 key from the full S3 URL
+	s3Key := extractS3Key(purchase.Product.FileURL)
+	if s3Key == "" {
+		return fmt.Errorf("failed to extract S3 key from URL: %s", purchase.Product.FileURL)
+	}
+	
+	// Load S3 configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %v", err)
+	}
+	
+	// Create S3 service
+	s3Service, err := services.NewS3Service(&cfg.S3)
+	if err != nil {
+		return fmt.Errorf("failed to create S3 service: %v", err)
+	}
+	
+	// Delete the file
+	if err := s3Service.DeleteFile(s3Key); err != nil {
+		return fmt.Errorf("failed to delete S3 file: %v", err)
+	}
+	
+	fmt.Printf("Successfully deleted S3 file for purchase %s: %s\n", purchase.ID, s3Key)
+	return nil
 }

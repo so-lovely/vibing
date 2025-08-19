@@ -49,9 +49,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   <h4 className="font-medium text-sm truncate">
                     {conversation.otherUserName}
                   </h4>
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    conversation.otherPartyDeleted ? 'bg-red-500' : 'bg-green-500'
-                  }`}></div>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500"></div>
                 </div>
                 
                 {conversation.productName && (
@@ -60,11 +58,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   </p>
                 )}
                 
-                {conversation.otherPartyDeleted ? (
-                  <p className="text-xs text-red-500 mt-1 truncate">
-                    삭제된 채팅
-                  </p>
-                ) : conversation.lastMessage ? (
+                {conversation.lastMessage ? (
                   <p className="text-xs text-muted-foreground mt-1 truncate">
                     {conversation.lastMessage.text}
                   </p>
