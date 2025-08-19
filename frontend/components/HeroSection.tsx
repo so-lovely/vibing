@@ -1,54 +1,62 @@
 
-import { Code, Zap, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function HeroSection() {
-  return (
-    <section className="py-20 px-4">
-      <div className="container mx-auto">
-        <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-            최고의 소프트웨어 마켓플레이스
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-            라이브러리, CLI 도구, 웹사이트 템플릿부터 커스텀 서비스까지. 
-            개발자의 생산성을 높이는 모든 것을 한 곳에서 만나보세요.
-          </p>
-          
+  const [isVisible, setIsVisible] = useState(false);
 
-          {/* Features */}
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            <div className="flex flex-col items-center p-6 rounded-lg bg-card border">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
-                <Code className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">고품질 코드</h3>
-              <p className="text-muted-foreground text-center">
-                검증된 라이브러리와 도구만 엄선해서 제공합니다
-              </p>
-            </div>
-            
-            <div className="flex flex-col items-center p-6 rounded-lg bg-card border">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">즉시 사용 가능</h3>
-              <p className="text-muted-foreground text-center">
-                구매 후 다운로드를 즉시 제공받으세요
-              </p>
-            </div>
-            
-            <div className="flex flex-col items-center p-6 rounded-lg bg-card border">
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
-                <Users className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">개발자 커뮤니티</h3>
-              <p className="text-muted-foreground text-center">
-                리뷰와 평점으로 최고의 선택을 할 수 있습니다
-              </p>
-            </div>
+  useEffect(() => {
+    setIsVisible(true);
+  }, []);
+
+  return (
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Subtle gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-primary/3" />
+      
+      {/* Minimal geometric accent */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="w-px h-32 bg-gradient-to-b from-transparent via-border to-transparent opacity-40" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-px bg-gradient-to-r from-transparent via-border to-transparent opacity-40" />
+      </div>
+
+      {/* Main content */}
+      <div className={`relative z-10 text-center transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className="space-y-6">
+          <div className="relative inline-block">
+            <h1 className="text-8xl font-light tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+              VIBING
+            </h1>
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-24 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
           </div>
+          
+          <p className="text-lg text-muted-foreground font-light tracking-wide">
+            Developer Marketplace
+          </p>
         </div>
       </div>
+
+      {/* Subtle animated dots */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 h-0.5 bg-primary/20 rounded-full"
+            style={{
+              left: `${20 + (i * 12)}%`,
+              top: `${60 + (i % 2 === 0 ? 10 : -5)}%`,
+              animation: `fade ${4 + i}s ease-in-out infinite`,
+              animationDelay: `${i * 0.8}s`
+            }}
+          />
+        ))}
+      </div>
+
+      <style jsx>{`
+        @keyframes fade {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.6; }
+        }
+      `}</style>
     </section>
   );
 }
