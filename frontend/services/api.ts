@@ -1,3 +1,5 @@
+import { handleSessionExpiration } from '../utils/auth';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 class ApiError extends Error {
@@ -31,6 +33,13 @@ export const apiClient = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: { message: 'Network error' } }));
+      
+      // Handle session expiration (401 Unauthorized)
+      if (response.status === 401) {
+        handleSessionExpiration();
+        return;
+      }
+      
       throw new ApiError(response.status, errorData.error?.message || 'Request failed');
     }
 

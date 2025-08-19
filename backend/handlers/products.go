@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 	"vibing-backend/database"
 	"vibing-backend/models"
 	"vibing-backend/utils"
@@ -237,16 +239,123 @@ func ToggleLike(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Not implemented"})
 }
 
-// GetProductReviews gets product reviews
+// GetProductReviews retrieves reviews for a specific product
 func GetProductReviews(c *fiber.Ctx) error {
-	// Implementation placeholder
-	return c.JSON(fiber.Map{"message": "Not implemented"})
+	productID := c.Params("id")
+	if productID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Product ID is required",
+		})
+	}
+
+	// Parse pagination parameters
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	// Get product reviews
+	reviews, total, err := models.GetProductReviews(database.DB, productID, page, limit)
+	if err != nil {
+		log.Printf("Error getting product reviews: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch reviews",
+		})
+	}
+
+	hasMore := int64(page*limit) < total
+
+	return c.JSON(fiber.Map{
+		"reviews": reviews,
+		"total":   total,
+		"page":    page,
+		"limit":   limit,
+		"hasMore": hasMore,
+	})
 }
 
-// CreateReview creates product review
+// CreateReview creates a new review
 func CreateReview(c *fiber.Ctx) error {
-	// Implementation placeholder
-	return c.JSON(fiber.Map{"message": "Not implemented"})
+	// Parse request body
+	var req struct {
+		ProductID string `json:"productId" validate:"required"`
+		Rating    int    `json:"rating" validate:"required,min=1,max=5"`
+		Comment   string `json:"comment" validate:"max=1000"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	productID := req.ProductID
+
+	// Get user from context
+	userIDLocal := c.Locals("userID")
+	if userIDLocal == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+	userID, ok := userIDLocal.(string)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid user ID",
+		})
+	}
+
+	// Validate request
+	if req.Rating < 1 || req.Rating > 5 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Rating must be between 1 and 5",
+		})
+	}
+
+	// Check if user can review this product
+	canReview, err := models.CanUserReview(database.DB, userID, productID)
+	if err != nil {
+		log.Printf("Error checking review eligibility: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to check review eligibility",
+		})
+	}
+
+	if !canReview {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "You cannot review this product. Either you haven't purchased it or you have already reviewed it.",
+		})
+	}
+
+	// Create review
+	review := models.Review{
+		ProductID: productID,
+		UserID:    userID,
+		Rating:    req.Rating,
+		Comment:   req.Comment,
+	}
+
+	if err := database.DB.Create(&review).Error; err != nil {
+		log.Printf("Error creating review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to create review",
+		})
+	}
+
+	// Load user information
+	if err := database.DB.Preload("User").First(&review, review.ID).Error; err != nil {
+		log.Printf("Error loading review with user: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to load review",
+		})
+	}
+
+	return c.Status(201).JSON(review)
 }
 
 // GetCategories returns categories with product counts
@@ -285,4 +394,232 @@ func GetCategories(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"categories": categories,
 	})
+}
+
+// GetUserReviewForProduct gets user's review for a specific product
+func GetUserReviewForProduct(c *fiber.Ctx) error {
+	productID := c.Params("productId")
+	if productID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Product ID is required",
+		})
+	}
+
+	// Get user from context
+	userIDLocal := c.Locals("userID")
+	if userIDLocal == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+	userID, ok := userIDLocal.(string)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid user ID",
+		})
+	}
+
+	// Get user's review for the product
+	review, err := models.GetUserReviewForProduct(database.DB, userID, productID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{
+				"error": "Review not found",
+			})
+		}
+		log.Printf("Error getting user review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to fetch review",
+		})
+	}
+
+	return c.JSON(review)
+}
+
+// UpdateReview updates an existing review
+func UpdateReview(c *fiber.Ctx) error {
+	reviewID := c.Params("id")
+	if reviewID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Review ID is required",
+		})
+	}
+
+	// Get user from context
+	userIDLocal := c.Locals("userID")
+	if userIDLocal == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+	userID, ok := userIDLocal.(string)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid user ID",
+		})
+	}
+
+	// Parse request body
+	var req struct {
+		Rating  *int    `json:"rating,omitempty" validate:"omitempty,min=1,max=5"`
+		Comment *string `json:"comment,omitempty" validate:"omitempty,max=1000"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Find the review and verify ownership
+	var review models.Review
+	if err := database.DB.Where("id = ? AND user_id = ?", reviewID, userID).First(&review).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{
+				"error": "Review not found or you don't have permission to update it",
+			})
+		}
+		log.Printf("Error finding review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to find review",
+		})
+	}
+
+	// Update fields if provided
+	if req.Rating != nil {
+		if *req.Rating < 1 || *req.Rating > 5 {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Rating must be between 1 and 5",
+			})
+		}
+		review.Rating = *req.Rating
+	}
+
+	if req.Comment != nil {
+		review.Comment = *req.Comment
+	}
+
+	// Save the review
+	if err := database.DB.Save(&review).Error; err != nil {
+		log.Printf("Error updating review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to update review",
+		})
+	}
+
+	// Load user information
+	if err := database.DB.Preload("User").First(&review, review.ID).Error; err != nil {
+		log.Printf("Error loading review with user: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to load review",
+		})
+	}
+
+	return c.JSON(review)
+}
+
+// DeleteReview deletes a review
+func DeleteReview(c *fiber.Ctx) error {
+	reviewID := c.Params("id")
+	if reviewID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Review ID is required",
+		})
+	}
+
+	// Get user from context
+	userIDLocal := c.Locals("userID")
+	if userIDLocal == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+	userID, ok := userIDLocal.(string)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid user ID",
+		})
+	}
+
+	// Find the review and verify ownership
+	var review models.Review
+	if err := database.DB.Where("id = ? AND user_id = ?", reviewID, userID).First(&review).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(fiber.Map{
+				"error": "Review not found or you don't have permission to delete it",
+			})
+		}
+		log.Printf("Error finding review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to find review",
+		})
+	}
+
+	// Delete the review
+	if err := database.DB.Delete(&review).Error; err != nil {
+		log.Printf("Error deleting review: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to delete review",
+		})
+	}
+
+	return c.Status(204).Send(nil)
+}
+
+// CanUserReview checks if user can review a specific product
+func CanUserReview(c *fiber.Ctx) error {
+	productID := c.Params("productId")
+	if productID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Product ID is required",
+		})
+	}
+
+	// Get user from context
+	userIDLocal := c.Locals("userID")
+	if userIDLocal == nil {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+	userID, ok := userIDLocal.(string)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{
+			"error": "Invalid user ID",
+		})
+	}
+
+	// Check if user can review
+	canReview, err := models.CanUserReview(database.DB, userID, productID)
+	if err != nil {
+		log.Printf("Error checking review eligibility: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to check review eligibility",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"canReview": canReview,
+	})
+}
+
+// GetRatingDistribution gets rating distribution for a product
+func GetRatingDistribution(c *fiber.Ctx) error {
+	productID := c.Params("productId")
+	if productID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Product ID is required",
+		})
+	}
+
+	// Get rating distribution
+	distribution, err := models.GetRatingDistribution(database.DB, productID)
+	if err != nil {
+		log.Printf("Error getting rating distribution: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to get rating distribution",
+		})
+	}
+
+	return c.JSON(distribution)
 }

@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ProductImageCard } from '../components/product/ProductImageCard';
 import { ProductDetailsCard } from '../components/product/ProductDetailsCard';
-import { SellerReviews } from '../components/product/SellerReviews';
+import { ReviewSection } from '../components/review/ReviewSection';
 import { SellerCard } from '../components/product/SellerCard';
 import type { Product } from '../types/product';
 import { productApi } from '../services/productApi';
@@ -67,11 +67,12 @@ export function ProductDescriptionPage() {
           {/* Product Details */}
           <ProductDetailsCard product={product} />
 
-          {/* Seller Reviews */}
-          <SellerReviews 
+          {/* Reviews Section */}
+          <ReviewSection 
+            productId={product.id}
             sellerName={product.author}
-            averageRating={4.7}
-            totalReviews={23}
+            averageRating={product.rating || 0}
+            totalReviews={product.reviewCount || 0}
           />
         </div>
       </div>

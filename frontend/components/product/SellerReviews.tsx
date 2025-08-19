@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Separator } from '../ui/separator';
+import { useState, useEffect } from 'react';
+import { reviewApi } from '../../services/reviewApi';
 
 interface SellerReview {
   id: string;
@@ -15,45 +17,45 @@ interface SellerReview {
 }
 
 interface SellerReviewsProps {
+  productId: string;
   sellerName: string;
   averageRating: number;
   totalReviews: number;
-  reviews?: SellerReview[];
 }
 
-const mockSellerReviews: SellerReview[] = [
-  {
-    id: "1",
-    reviewer: "김개발자",
-    rating: 5,
-    comment: "매우 친절하고 빠른 응답을 해주시는 판매자입니다. 제품 품질도 훌륭합니다!",
-    date: "2024-02-10",
-    verifiedPurchase: true
-  },
-  {
-    id: "2", 
-    reviewer: "이코더",
-    rating: 4,
-    comment: "좋은 품질의 제품을 제공해주셨어요. 다음에도 이용하고 싶습니다.",
-    date: "2024-02-05",
-    verifiedPurchase: true
-  },
-  {
-    id: "3",
-    reviewer: "박프로그래머",
-    rating: 5,
-    comment: "문서화가 잘 되어있고 지원도 빠르게 해주셔서 좋았습니다.",
-    date: "2024-01-28",
-    verifiedPurchase: true
-  }
-];
-
 export function SellerReviews({ 
+  productId,
   sellerName, 
   averageRating, 
-  totalReviews,
-  reviews = mockSellerReviews 
+  totalReviews
 }: SellerReviewsProps) {
+  const [reviews, setReviews] = useState<SellerReview[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        setLoading(true);
+        const response = await reviewApi.getProductReviews(productId, 1, 10);
+        setReviews(response.reviews.map(review => ({
+          id: review.id,
+          reviewer: review.user.username || review.user.email,
+          reviewerAvatar: review.user.avatar,
+          rating: review.rating,
+          comment: review.comment,
+          date: review.createdAt,
+          verifiedPurchase: true
+        })));
+      } catch (error) {
+        console.error('Failed to fetch reviews:', error);
+        setReviews([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, [productId]);
   
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('ko-KR', {
@@ -99,7 +101,11 @@ export function SellerReviews({
 
         {/* Reviews List */}
         <div className="space-y-4">
-          {reviews.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>리뷰를 불러오는 중...</p>
+            </div>
+          ) : reviews.length > 0 ? (
             reviews.map((review, index) => (
               <div key={review.id}>
                 <div className="flex gap-3">

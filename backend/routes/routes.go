@@ -53,8 +53,15 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	productRoutes.Put("/:id", middleware.Auth(), handlers.UpdateProduct)
 	productRoutes.Delete("/:id", middleware.Auth(), handlers.DeleteProduct)
 	productRoutes.Post("/:id/like", middleware.Auth(), handlers.ToggleLike)
-	productRoutes.Get("/:id/reviews", handlers.GetProductReviews)
-	productRoutes.Post("/:id/reviews", middleware.Auth(), handlers.CreateReview)
+	// Review routes
+	reviewRoutes := api.Group("/reviews")
+	reviewRoutes.Get("/product/:id", handlers.GetProductReviews)
+	reviewRoutes.Get("/user/product/:productId", middleware.Auth(), handlers.GetUserReviewForProduct)
+	reviewRoutes.Post("/", middleware.Auth(), handlers.CreateReview)
+	reviewRoutes.Put("/:id", middleware.Auth(), handlers.UpdateReview)
+	reviewRoutes.Delete("/:id", middleware.Auth(), handlers.DeleteReview)
+	reviewRoutes.Get("/can-review/:productId", middleware.Auth(), handlers.CanUserReview)
+	reviewRoutes.Get("/product/:productId/rating-distribution", handlers.GetRatingDistribution)
 
 	// Payment routes with rate limiting
 	paymentRoutes := api.Group("/payment")

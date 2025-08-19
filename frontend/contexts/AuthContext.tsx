@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi } from '../services/authApi';
+import { clearAuthData } from '../utils/auth';
 import type { User } from '../types/auth';
 
 interface AuthContextType {
@@ -11,6 +12,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUser: (updatedUser: User) => void;
   isAuthenticated: boolean;
+  handleSessionExpiration: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,14 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } catch (error) {
             // Token invalid, clear storage
             console.error('Token validation failed:', error);
-            localStorage.removeItem('auth-token');
-            localStorage.removeItem('auth-user');
+            clearAuthData();
           }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        localStorage.removeItem('auth-token');
-        localStorage.removeItem('auth-user');
+        clearAuthData();
       } finally {
         setLoading(false);
       }
@@ -83,16 +83,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout();
       setUser(null);
       setToken(null);
-      localStorage.removeItem('auth-token');
-      localStorage.removeItem('auth-user');
+      clearAuthData();
     } catch (error) {
       console.error('Logout error:', error);
+      // Clear local data even if API call fails
+      setUser(null);
+      setToken(null);
+      clearAuthData();
     }
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
     localStorage.setItem('auth-user', JSON.stringify(updatedUser));
+  };
+
+  const handleSessionExpiration = () => {
+    console.log('Session expired, logging out...');
+    setUser(null);
+    setToken(null);
+    clearAuthData();
   };
 
   const value = {
@@ -103,7 +113,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signup,
     logout,
     updateUser,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    handleSessionExpiration
   };
 
   return (

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, AlertTriangle, Clock, Eye } from 'lucide-react';
+import { Download, FileText, AlertTriangle, Clock, Eye, Star } from 'lucide-react';
 import PurchaseStatusBadge from './PurchaseStatusBadge';
 import DisputeRequestModal from './DisputeRequestModal';
+import { ReviewForm } from '../review/ReviewForm';
+import { reviewApi } from '../../services/reviewApi';
+import { handleSessionExpiration } from '../../utils/auth';
 import { formatPrice, convertUsdToKrw } from '../../utils/purchaseUtils';
 
 interface Purchase {
@@ -47,6 +50,22 @@ export default function PurchaseHistory() {
     productTitle: ''
   });
   const [disputeLoading, setDisputeLoading] = useState(false);
+  
+  // 리뷰 관련 상태
+  const [reviewModal, setReviewModal] = useState<{
+    isOpen: boolean;
+    productId: string;
+    productTitle: string;
+  }>({
+    isOpen: false,
+    productId: '',
+    productTitle: ''
+  });
+  const [reviewStates, setReviewStates] = useState<Record<string, {
+    canReview: boolean;
+    hasReview: boolean;
+    loading: boolean;
+  }>>({});
 
   useEffect(() => {
     fetchPurchaseHistory();
@@ -70,6 +89,10 @@ export default function PurchaseHistory() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          handleSessionExpiration();
+          return;
+        }
         const errorData = await response.json().catch(() => ({}));
         console.error('API Error:', { status: response.status, errorData });
         throw new Error(errorData.error?.message || `HTTP ${response.status}: Failed to fetch purchase history`);
@@ -83,8 +106,12 @@ export default function PurchaseHistory() {
         throw new Error('Invalid response format');
       }
       
-      setPurchases(Array.isArray(data.purchases) ? data.purchases : []);
+      const purchaseData = Array.isArray(data.purchases) ? data.purchases : [];
+      setPurchases(purchaseData);
       setPagination(data.pagination || null);
+      
+      // 각 구매에 대한 리뷰 상태를 확인
+      await checkReviewStates(purchaseData);
     } catch (error) {
       console.error('Error fetching purchase history:', error);
       // Show error to user
@@ -92,6 +119,44 @@ export default function PurchaseHistory() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 리뷰 상태 확인
+  const checkReviewStates = async (purchaseList: Purchase[]) => {
+    const newReviewStates: Record<string, { canReview: boolean; hasReview: boolean; loading: boolean; }> = {};
+    
+    for (const purchase of purchaseList) {
+      // 완료된 구매만 리뷰 가능
+      if (purchase.status === 'completed' || purchase.status === 'confirmed') {
+        newReviewStates[purchase.product.id] = { canReview: false, hasReview: false, loading: true };
+        
+        try {
+          // 리뷰 작성 가능 여부 확인
+          const canReview = await reviewApi.canUserReview(purchase.product.id);
+          
+          // 기존 리뷰 존재 여부 확인
+          const existingReview = await reviewApi.getUserReviewForProduct(purchase.product.id);
+          
+          newReviewStates[purchase.product.id] = {
+            canReview: canReview,
+            hasReview: existingReview !== null,
+            loading: false
+          };
+        } catch (error) {
+          console.error(`Error checking review state for product ${purchase.product.id}:`, error);
+          newReviewStates[purchase.product.id] = { canReview: false, hasReview: false, loading: false };
+        }
+      }
+    }
+    
+    setReviewStates(newReviewStates);
+  };
+
+  // 리뷰 작성 완료 핸들러
+  const handleReviewSubmitted = () => {
+    setReviewModal({ isOpen: false, productId: '', productTitle: '' });
+    // 리뷰 상태를 다시 확인
+    checkReviewStates(purchases);
   };
 
   const handleDisputeRequest = async (reason: string) => {
@@ -279,6 +344,41 @@ export default function PurchaseHistory() {
                         라이선스 복사
                       </button>
                     )}
+
+                    {/* 리뷰 버튼 */}
+                    {(purchase.status === 'completed' || purchase.status === 'confirmed') && (
+                      <>
+                        {reviewStates[purchase.product.id]?.loading ? (
+                          <button
+                            disabled
+                            className="inline-flex items-center px-3 py-1.5 text-sm text-gray-400 cursor-not-allowed rounded-lg"
+                          >
+                            <Star className="h-4 w-4 mr-1.5" />
+                            확인 중...
+                          </button>
+                        ) : reviewStates[purchase.product.id]?.hasReview ? (
+                          <button
+                            disabled
+                            className="inline-flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded-lg cursor-not-allowed"
+                          >
+                            <Star className="h-4 w-4 mr-1.5 fill-yellow-400 text-yellow-400" />
+                            리뷰 작성완료
+                          </button>
+                        ) : reviewStates[purchase.product.id]?.canReview ? (
+                          <button
+                            onClick={() => setReviewModal({
+                              isOpen: true,
+                              productId: purchase.product.id,
+                              productTitle: purchase.product.title
+                            })}
+                            className="inline-flex items-center px-3 py-1.5 text-sm text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors"
+                          >
+                            <Star className="h-4 w-4 mr-1.5" />
+                            리뷰쓰기
+                          </button>
+                        ) : null}
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -354,6 +454,40 @@ export default function PurchaseHistory() {
         productTitle={disputeModal.productTitle}
         isLoading={disputeLoading}
       />
+
+      {/* 리뷰 작성 모달 */}
+      {reviewModal.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => setReviewModal({ isOpen: false, productId: '', productTitle: '' })}></div>
+            
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            
+            <div className="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  리뷰 작성 - {reviewModal.productTitle}
+                </h3>
+                <button
+                  onClick={() => setReviewModal({ isOpen: false, productId: '', productTitle: '' })}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <ReviewForm
+                productId={reviewModal.productId}
+                onReviewSubmitted={handleReviewSubmitted}
+                onCancel={() => setReviewModal({ isOpen: false, productId: '', productTitle: '' })}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
