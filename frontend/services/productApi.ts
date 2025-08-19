@@ -63,7 +63,7 @@ export const productApi = {
   },
 
   // Get categories with counts
-  async getCategories(): Promise<Array<{ id: string; name: string; count: number }>> {
+  async getCategories(): Promise<{ categories: Array<{ id: string; name: string; count: number }> }> {
     return apiClient.get('/products/categories');
   },
 };

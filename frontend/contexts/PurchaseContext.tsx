@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { purchaseApi } from '../services/purchaseApi';
 import { usePayment } from '../hooks/usePayment';
-import type { PurchaseHistoryItem, Product } from '../types/purchase';
+import type { PurchaseHistoryItem } from '../types/purchase';
+import type { Product } from '../types/product';
 
 interface PurchaseFormData {
   email: string;

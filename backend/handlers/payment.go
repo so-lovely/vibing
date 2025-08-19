@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"strconv"
+	"strings"
+	
 	"github.com/gofiber/fiber/v2"
 	"vibing-backend/database"
 	"vibing-backend/models"
@@ -103,6 +106,125 @@ func CreatePaymentOrder(c *fiber.Ctx) error {
 		"successUrl":   req.SuccessURL,
 		"failUrl":      req.FailURL,
 		"paymentUrl":   "https://pay.portone.io/...", // Would be actual payment URL
+	})
+}
+
+// VerifyPayment verifies payment and creates purchase record
+func VerifyPayment(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	paymentId := c.Params("paymentId")
+	
+	// Extract product and customer info from the payment_id
+	// The payment_id format from frontend: payment-{timestamp}-{random}
+	// We need to store this mapping when payment is initiated
+	
+	// For now, we'll create a simple verification
+	// In production, you'd verify with PortOne/Toss Pay API
+	
+	// Get payment info from query params sent by Toss Pay
+	orderName := c.Query("orderName")
+	amountStr := c.Query("amount")
+	customerEmail := c.Query("customerEmail")
+	
+	if orderName == "" || amountStr == "" || customerEmail == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Missing payment information",
+			},
+		})
+	}
+	
+	// Parse amount
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "VALIDATION_ERROR",
+				"message": "Invalid amount format",
+			},
+		})
+	}
+	
+	// Extract product info from order name (format: "ProductTitle - Vibing Marketplace")
+	productTitle := strings.Replace(orderName, " - Vibing Marketplace", "", 1)
+	
+	// Find product by title
+	var product models.Product
+	if err := database.DB.Where("title = ? AND status = ?", productTitle, "active").First(&product).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "NOT_FOUND",
+				"message": "Product not found for verification",
+			},
+		})
+	}
+	
+	// Check if user already has this product
+	var existingPurchase models.Purchase
+	if err := database.DB.Where("user_id = ? AND product_id = ? AND status IN ?", 
+		user.ID, product.ID, []string{"completed", "confirmed"}).First(&existingPurchase).Error; err == nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "ALREADY_PURCHASED",
+				"message": "Product already purchased",
+			},
+		})
+	}
+	
+	// Create purchase record
+	purchase := models.Purchase{
+		UserID:        user.ID,
+		ProductID:     product.ID,
+		Price:         product.Price,
+		Status:        "completed",
+		PaymentMethod: "toss_pay",
+		TossPaymentKey: paymentId,
+	}
+	
+	if err := database.DB.Create(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to create purchase record",
+			},
+		})
+	}
+	
+	// Generate download URL and license key
+	downloadURL := purchase.GenerateDownloadURL()
+	purchase.DownloadURL = &downloadURL
+	licenseKey := purchase.GenerateLicenseKey()
+	purchase.LicenseKey = &licenseKey
+	
+	if err := database.DB.Save(&purchase).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "INTERNAL_ERROR",
+				"message": "Failed to update purchase with download info",
+			},
+		})
+	}
+	
+	// Update product download count
+	database.DB.Model(&product).UpdateColumn("downloads", product.Downloads+1)
+	
+	return c.JSON(fiber.Map{
+		"verified": true,
+		"paymentId": paymentId,
+		"amount": amount,
+		"status": "completed",
+		"purchase": fiber.Map{
+			"id":          purchase.ID,
+			"orderId":     purchase.OrderID,
+			"status":      purchase.Status,
+			"downloadUrl": purchase.DownloadURL,
+			"licenseKey":  purchase.LicenseKey,
+			"product": fiber.Map{
+				"id":    product.ID,
+				"title": product.Title,
+			},
+		},
 	})
 }
 

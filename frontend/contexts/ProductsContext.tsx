@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { productApi } from '../services/productApi';
-import { sortOptions, priceFilters } from '../constants/products';
-import type { Product } from '../types/product';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { productApi } from "../services/productApi";
+import { sortOptions, priceFilters } from "../constants/products";
+import type { Product } from "../types/product";
 
 interface ProductsContextType {
   // Data
@@ -9,17 +15,17 @@ interface ProductsContextType {
   categories: Array<{ id: string; name: string; count: number }>;
   sortOptions: typeof sortOptions;
   priceFilters: typeof priceFilters;
-  
+
   // Filters
   selectedCategory: string;
   selectedSort: string;
   selectedPriceFilter: string;
   searchQuery: string;
-  
+
   // State
   loading: boolean;
   error: string | null;
-  
+
   // Actions
   setSelectedCategory: (category: string) => void;
   setSelectedSort: (sort: string) => void;
@@ -28,7 +34,7 @@ interface ProductsContextType {
   toggleLike: (productId: string) => void;
   loadProducts: () => Promise<void>;
   loadCategories: () => Promise<void>;
-  
+
   // Pagination
   currentPage: number;
   itemsPerPage: number;
@@ -37,7 +43,9 @@ interface ProductsContextType {
   setCurrentPage: (page: number) => void;
 }
 
-const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
+const ProductsContext = createContext<ProductsContextType | undefined>(
+  undefined
+);
 
 interface ProductsProviderProps {
   children: ReactNode;
@@ -45,13 +53,15 @@ interface ProductsProviderProps {
 
 export function ProductsProvider({ children }: ProductsProviderProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; count: number }>>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; count: number }>
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [totalItems, setTotalItems] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSort, setSelectedSort] = useState('newest');
-  const [selectedPriceFilter, setSelectedPriceFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSort, setSelectedSort] = useState("newest");
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
@@ -60,9 +70,9 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
   const loadCategories = React.useCallback(async () => {
     try {
       const response = await productApi.getCategories();
-      setCategories(response.categories || response);
+      setCategories(response.categories);
     } catch (err) {
-      console.error('Failed to load categories:', err);
+      console.error("Failed to load categories:", err);
       // Fallback to empty categories if API fails
       setCategories([]);
     }
@@ -73,7 +83,9 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
     setLoading(true);
     setError(null);
     try {
-      const priceFilter = priceFilters.find(f => f.value === selectedPriceFilter);
+      const priceFilter = priceFilters.find(
+        (f) => f.value === selectedPriceFilter
+      );
       const filters = {
         category: selectedCategory,
         search: searchQuery.trim() || undefined,
@@ -88,13 +100,20 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
       setProducts(response.products);
       setTotalItems(response.pagination.totalItems);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load products';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load products";
       setError(errorMessage);
-      console.error('Failed to load products:', err);
+      console.error("Failed to load products:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedSort, selectedPriceFilter, searchQuery, currentPage]);
+  }, [
+    selectedCategory,
+    selectedSort,
+    selectedPriceFilter,
+    searchQuery,
+    currentPage,
+  ]);
 
   // Load categories on mount
   React.useEffect(() => {
@@ -115,9 +134,9 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
   }, [selectedCategory, selectedSort, selectedPriceFilter, searchQuery]);
 
   const toggleProductLike = (productId: string) => {
-    setProducts(prevProducts => 
-      prevProducts.map(product => 
-        product.id === productId 
+    setProducts((prevProducts) =>
+      prevProducts.map((product) =>
+        product.id === productId
           ? { ...product, isLiked: !product.isLiked }
           : product
       )
@@ -130,17 +149,17 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
     categories,
     sortOptions,
     priceFilters,
-    
+
     // Filters
     selectedCategory,
     selectedSort,
     selectedPriceFilter,
     searchQuery,
-    
+
     // State
     loading,
     error,
-    
+
     // Actions
     setSelectedCategory,
     setSelectedSort,
@@ -149,13 +168,13 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
     toggleLike: toggleProductLike,
     loadProducts,
     loadCategories,
-    
+
     // Pagination
     currentPage,
     itemsPerPage,
     totalPages,
     totalItems,
-    setCurrentPage
+    setCurrentPage,
   };
 
   return (
@@ -168,7 +187,7 @@ export function ProductsProvider({ children }: ProductsProviderProps) {
 export function useProducts() {
   const context = useContext(ProductsContext);
   if (context === undefined) {
-    throw new Error('useProducts must be used within a ProductsProvider');
+    throw new Error("useProducts must be used within a ProductsProvider");
   }
   return context;
 }

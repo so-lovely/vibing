@@ -18,7 +18,7 @@ interface ProductCardProps {
   category: string;
   author: string;
   authorId?: string;
-  imageUrl: string;
+  imageUrl?: string;
   isPro?: boolean;
   isLiked?: boolean;
 }
@@ -52,7 +52,7 @@ export function ProductCard({
       <CardHeader className="p-0">
         <div className="relative overflow-hidden rounded-t-lg">
           <ImageWithFallback 
-            src={imageUrl}
+            src={imageUrl || ""}
             alt={title}
             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
           />

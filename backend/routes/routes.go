@@ -63,6 +63,11 @@ func Setup(app *fiber.App, cfg *config.Config) {
 	paymentRoutes.Post("/confirm", middleware.Auth(), handlers.ConfirmPayment)
 	paymentRoutes.Post("/webhook", handlers.PaymentWebhook)
 	paymentRoutes.Get("/cancel/:orderId", middleware.Auth(), handlers.CancelPayment)
+	
+	// Payment verification routes
+	paymentsRoutes := api.Group("/payments")
+	paymentsRoutes.Use(middleware.Auth())
+	paymentsRoutes.Post("/verify/:paymentId", handlers.VerifyPayment)
 
 	// Purchase routes
 	purchaseRoutes := api.Group("/purchase")

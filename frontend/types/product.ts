@@ -21,6 +21,7 @@ export interface Product {
   licenseType?: string;
   createdAt: string;
   updatedAt: string;
+  isLiked?: boolean;
   
   // Keep these for compatibility
   isPremium?: boolean;

@@ -26,6 +26,17 @@ export interface PaymentResult {
   status?: string;
   errorCode?: string;
   errorMessage?: string;
+  purchaseInfo?: {
+    id: string;
+    orderId: string;
+    status: string;
+    downloadUrl?: string;
+    licenseKey?: string;
+    product: {
+      id: string;
+      title: string;
+    };
+  };
 }
 
 class PaymentService {
@@ -94,11 +105,17 @@ class PaymentService {
     }
   }
 
-  async verifyPayment(paymentId: string): Promise<PaymentResult> {
+  async verifyPayment(paymentId: string, orderName?: string, amount?: number, customerEmail?: string): Promise<PaymentResult> {
     try {
-      // In a real implementation, this would call your backend to verify the payment
-      // For now, we'll simulate a successful verification
-      const response = await fetch(`/api/payments/verify/${paymentId}`, {
+      // Build query parameters for verification
+      const params = new URLSearchParams();
+      if (orderName) params.append('orderName', orderName);
+      if (amount) params.append('amount', amount.toString());
+      if (customerEmail) params.append('customerEmail', customerEmail);
+      
+      const url = `/api/payments/verify/${paymentId}${params.toString() ? '?' + params.toString() : ''}`;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +124,8 @@ class PaymentService {
       });
 
       if (!response.ok) {
-        throw new Error('Payment verification failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Payment verification failed');
       }
 
       const result = await response.json();
@@ -116,6 +134,7 @@ class PaymentService {
         paymentId: result.paymentId,
         amount: result.amount,
         status: result.status,
+        purchaseInfo: result.purchase,
       };
     } catch (error) {
       console.error('Payment verification failed:', error);
@@ -145,7 +164,7 @@ class PaymentService {
         fullName: 'Test User',
         email: customerEmail,
       },
-      redirectUrl: `${window.location.origin}/purchase/success?payment_id=${paymentId}`,
+      redirectUrl: `${window.location.origin}/purchase/success?payment_id=${paymentId}&order_name=${encodeURIComponent(orderName)}&amount=${amountKrw}&customer_email=${encodeURIComponent(customerEmail)}`,
       noticeUrls: [`${window.location.origin}/api/payments/webhook`],
     });
   }

@@ -18,19 +18,26 @@ export function PaymentSuccessPage() {
   useEffect(() => {
     const paymentId = searchParams.get('payment_id');
     const impUid = searchParams.get('imp_uid');
-    const merchantUid = searchParams.get('merchant_uid');
+    const orderName = searchParams.get('order_name');
+    const amount = searchParams.get('amount');
+    const customerEmail = searchParams.get('customer_email');
     
     if (paymentId || impUid) {
-      verifyPayment(paymentId || impUid || '');
+      verifyPayment(
+        paymentId || impUid || '', 
+        orderName || undefined,
+        amount ? parseInt(amount) : undefined,
+        customerEmail || undefined
+      );
     } else {
       setVerificationStatus('failed');
       setPaymentInfo({ errorMessage: 'Missing payment information' });
     }
   }, [searchParams]);
 
-  const verifyPayment = async (paymentId: string) => {
+  const verifyPayment = async (paymentId: string, orderName?: string, amount?: number, customerEmail?: string) => {
     try {
-      const result = await paymentService.verifyPayment(paymentId);
+      const result = await paymentService.verifyPayment(paymentId, orderName, amount, customerEmail);
       
       if (result.success) {
         setVerificationStatus('success');

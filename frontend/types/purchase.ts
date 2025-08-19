@@ -1,7 +1,7 @@
-export interface Product {
+export interface PurchaseProduct {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl?: string;
   author: string;
 }
 
@@ -12,7 +12,7 @@ export interface PurchaseHistoryItem {
   status: 'completed' | 'pending' | 'failed' | 'refunded' | 'cancelled';
   orderId: string;
   paymentMethod: string;
-  product: Product;
+  product: PurchaseProduct;
   downloadUrl?: string;
   licenseKey?: string;
 }

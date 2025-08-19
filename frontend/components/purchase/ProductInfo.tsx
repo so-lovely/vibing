@@ -1,7 +1,7 @@
 import { Badge } from '../ui/badge';
 import { ImageWithFallback } from '../ui/image-with-fallback';
 import type { Product } from '../../types/product';
-import type { Product as PurchaseProduct } from '../../types/purchase';
+import type { PurchaseProduct } from '../../types/purchase';
 
 interface ProductInfoProps {
   product: Product | PurchaseProduct;
@@ -44,7 +44,7 @@ export function ProductInfo({
         <p className="text-sm text-muted-foreground mt-1">
           by {product.author}
         </p>
-        {showCategory && 'category' in product && (
+        {showCategory && 'category' in product && 'isPro' in product && (
           <div className="flex items-center space-x-2 mt-2">
             <Badge variant={product.isPro ? "default" : "secondary"}>
               {product.isPro ? "PRO" : product.category}

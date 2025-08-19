@@ -20,7 +20,7 @@ interface Purchase {
   product: {
     id: string;
     title: string;
-    imageUrl: string;
+    imageUrl?: string;
     author: string;
   };
 }
@@ -203,7 +203,7 @@ export default function PurchaseHistory() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-4">
                     <img
-                      src={purchase.product.imageUrl}
+                      src={purchase.product.imageUrl || '/placeholder-product.png'}
                       alt={purchase.product.title}
                       className="w-16 h-16 object-cover rounded-lg bg-gray-100"
                     />

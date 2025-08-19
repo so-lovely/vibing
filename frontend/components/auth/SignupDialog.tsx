@@ -28,7 +28,8 @@ function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any
     password: '',
     name: '',
     role: 'buyer',
-    phone: ''
+    phone: '',
+    phoneVerified: false
   });
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -83,7 +84,7 @@ function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any
       }
       
       // Reset form
-      setFormData({ email: '', password: '', name: '', role: 'buyer', phone: '' });
+      setFormData({ email: '', password: '', name: '', role: 'buyer', phone: '', phoneVerified: false });
       setShowVerification(false);
       resetVerification();
     } catch (err) {
@@ -98,7 +99,7 @@ function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any
     resetVerification();
   };
 
-  const handleInputChange = (field: keyof SignupData, value: string | 'buyer' | 'seller') => {
+  const handleInputChange = (field: keyof SignupData, value: string | 'buyer' | 'seller' | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (error) setError(null);
   };
@@ -235,7 +236,7 @@ function SignupDialogContent({ onSignupSuccess }: { onSignupSuccess?: (user: any
               <Label>계정 유형</Label>
               <RadioGroup
                 value={formData.role}
-                onValueChange={(value) => handleInputChange('role', value as 'buyer' | 'seller')}
+                onValueChange={(value: string) => handleInputChange('role', value as 'buyer' | 'seller')}
                 className="grid grid-cols-2 gap-4"
                 disabled={loading}
               >

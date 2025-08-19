@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { User, Mail, Shield, Edit, Save, X } from 'lucide-react';
 import { apiClient } from '../services/api';
+import type { UpdateProfileResponse } from '../types/auth';
 
 export function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -47,7 +48,7 @@ export function ProfilePage() {
     
     setIsUpdating(true);
     try {
-      const response = await apiClient.put('/auth/profile', {
+      const response = await apiClient.put<UpdateProfileResponse>('/auth/profile', {
         name: editedUser.name.trim(),
       });
       

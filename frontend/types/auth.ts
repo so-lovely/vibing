@@ -34,3 +34,8 @@ export interface TokenResponse {
   token: string;
   refreshToken: string;
 }
+
+export interface UpdateProfileResponse {
+  user: User;
+  message: string;
+}
